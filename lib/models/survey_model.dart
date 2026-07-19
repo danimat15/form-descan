@@ -36,7 +36,7 @@ class SurveyModel {
   String? statusKepemilikan;
   String? buktiKepemilikan;
   String? sewaPerkiraan;
-  int? luasLantai;
+  double? luasLantai;
   String? bahanLantai;
   String? kondisiLantai;
   String? bahanDinding;
@@ -194,7 +194,7 @@ class SurveyModel {
       statusKepemilikan: json['statusKepemilikan'] as String?,
       buktiKepemilikan: json['buktiKepemilikan'] as String?,
       sewaPerkiraan: json['sewaPerkiraan'] as String?,
-      luasLantai: json['luasLantai'] as int?,
+      luasLantai: (json['luasLantai'] as num?)?.toDouble(),
       bahanLantai: json['bahanLantai'] as String?,
       kondisiLantai: json['kondisiLantai'] as String?,
       bahanDinding: json['bahanDinding'] as String?,
@@ -304,6 +304,227 @@ class SurveyModel {
       'rumahLainNilai': rumahLainNilai,
       'familyMembers': familyMembers.map((m) => m.toJson()).toList(),
     };
+  }
+
+  double getCompletionPercentage() {
+    // 1. Blok I (9 fields)
+    final blokIFields = [
+      namaKk, nikKk, noKk, provinsi, kabupatenKota, kecamatan, desaKelurahan, alamat
+    ];
+    int filledBlokI = 0;
+    for (var f in blokIFields) {
+      if (f != null && f.toString().trim().isNotEmpty) {
+        filledBlokI++;
+      }
+    }
+    if (jmlAnggotaKk != null && jmlAnggotaKk! > 0) {
+      filledBlokI++;
+    }
+    double pctBlokI = filledBlokI / 9.0;
+
+    // 2. Blok II (12 fields)
+    final blokIIFields = [
+      jenisBangunan, statusKepemilikan, bahanLantai, kondisiLantai,
+      bahanDinding, kondisiDinding, bahanAtap, kondisiAtap, sumberAirMinum, sumberPenerangan
+    ];
+    int filledBlokII = 0;
+    for (var f in blokIIFields) {
+      if (f != null && f.toString().trim().isNotEmpty) {
+        filledBlokII++;
+      }
+    }
+    if (jmlKeluargaTinggal != null && jmlKeluargaTinggal! > 0) {
+      filledBlokII++;
+    }
+    if (luasLantai != null && luasLantai! > 0.0) {
+      filledBlokII++;
+    }
+    double pctBlokII = filledBlokII / 12.0;
+
+    // 3. Blok III (8 fields)
+    // Assets are defaulted to 0 or 0.0, so they are always filled.
+    double pctBlokIII = 1.0; 
+
+    // 4. Blok IV (Anggota Keluarga)
+    double pctBlokIV = 0.0;
+    if (familyMembers.isNotEmpty) {
+      double totalMemberPct = 0.0;
+      for (var member in familyMembers) {
+        final memberFields = [
+          member.nama, member.nik, member.jenisKelamin, member.tglLahir,
+          member.statusKawin, member.hubunganKk, member.partisipasiSekolah,
+          member.ijazahTertinggi, member.profesi, member.statusPekerjaan
+        ];
+        int filledMember = 0;
+        for (var f in memberFields) {
+          if (f != null && f.toString().trim().isNotEmpty && f != 'Not Set') {
+            filledMember++;
+          }
+        }
+        totalMemberPct += (filledMember / 10.0);
+      }
+      pctBlokIV = totalMemberPct / familyMembers.length;
+    }
+
+    double totalPct = (pctBlokI + pctBlokII + pctBlokIII + pctBlokIV) / 4.0;
+    if (totalPct > 1.0) totalPct = 1.0;
+    if (totalPct < 0.0) totalPct = 0.0;
+    return totalPct;
+  }
+
+  int get completionPercentage => (getCompletionPercentage() * 100).round();
+
+  List<String> validate() {
+    final List<String> errors = [];
+
+    // 1. Blok I (Identitas Keluarga) - Wajib diisi
+    if (namaKk == null || namaKk!.trim().isEmpty) {
+      errors.add("Nama Kepala Keluarga wajib diisi.");
+    }
+    if (nikKk == null || nikKk!.trim().isEmpty) {
+      errors.add("NIK Kepala Keluarga wajib diisi.");
+    } else if (nikKk!.trim().length != 16) {
+      errors.add("NIK Kepala Keluarga harus 16 digit.");
+    }
+    if (noKk == null || noKk!.trim().isEmpty) {
+      errors.add("Nomor Kartu Keluarga (No KK) wajib diisi.");
+    } else if (noKk!.trim().length != 16) {
+      errors.add("Nomor Kartu Keluarga (No KK) harus 16 digit.");
+    }
+    if (jmlAnggotaKk == null || jmlAnggotaKk! <= 0) {
+      errors.add("Jumlah Anggota Keluarga harus lebih dari 0.");
+    }
+    if (provinsi == null || provinsi!.trim().isEmpty) {
+      errors.add("Provinsi wajib diisi.");
+    }
+    if (kabupatenKota == null || kabupatenKota!.trim().isEmpty) {
+      errors.add("Kabupaten/Kota wajib diisi.");
+    }
+    if (kecamatan == null || kecamatan!.trim().isEmpty) {
+      errors.add("Kecamatan wajib diisi.");
+    }
+    if (desaKelurahan == null || desaKelurahan!.trim().isEmpty) {
+      errors.add("Desa/Kelurahan wajib diisi.");
+    }
+    if (namaSls == null || namaSls!.trim().isEmpty) {
+      errors.add("Nama SLS/RT/RW wajib diisi.");
+    }
+
+    // 2. Blok II (Perumahan) - Wajib diisi
+    if (jmlKeluargaTinggal == null || jmlKeluargaTinggal! <= 0) {
+      errors.add("Jumlah Keluarga Tinggal di Rumah wajib diisi (> 0).");
+    }
+    if (jenisBangunan == null || jenisBangunan!.trim().isEmpty || jenisBangunan == 'Not Set') {
+      errors.add("Jenis Bangunan tempat tinggal wajib diisi.");
+    }
+    if (statusKepemilikan == null || statusKepemilikan!.trim().isEmpty || statusKepemilikan == 'Not Set') {
+      errors.add("Status Kepemilikan rumah wajib diisi.");
+    }
+    if (sumberAirMinum == null || sumberAirMinum!.trim().isEmpty || sumberAirMinum == 'Not Set') {
+      errors.add("Sumber Air Minum wajib diisi.");
+    }
+    if (sumberPenerangan == null || sumberPenerangan!.trim().isEmpty || sumberPenerangan == 'Not Set') {
+      errors.add("Sumber Penerangan wajib diisi.");
+    }
+
+    // 3. Blok IV (Anggota Keluarga) - Wajib diisi & Tidak Boleh Sama (NIK Unik)
+    if (familyMembers.isEmpty) {
+      errors.add("Daftar Anggota Keluarga tidak boleh kosong. Harap tambahkan minimal 1 anggota.");
+    } else {
+      final Set<String> niks = {};
+      final Set<String> duplicateNiks = {};
+      
+      for (int i = 0; i < familyMembers.length; i++) {
+        final member = familyMembers[i];
+        final memberNum = i + 1;
+        final name = member.nama.trim().isNotEmpty ? member.nama : 'Anggota #$memberNum';
+        
+        if (member.nama.trim().isEmpty) {
+          errors.add("Nama Lengkap Anggota Keluarga #$memberNum wajib diisi.");
+        }
+        
+        if (member.nik == null || member.nik!.trim().isEmpty) {
+          errors.add("NIK untuk $name wajib diisi.");
+        } else {
+          final cleanNik = member.nik!.trim();
+          if (cleanNik.length != 16) {
+            errors.add("NIK untuk $name harus 16 digit.");
+          }
+          if (niks.contains(cleanNik)) {
+            duplicateNiks.add(cleanNik);
+          } else {
+            niks.add(cleanNik);
+          }
+        }
+
+        if (member.jenisKelamin == null || member.jenisKelamin == 'Not Set') {
+          errors.add("Jenis Kelamin untuk $name wajib diisi.");
+        }
+        if (member.hubunganKk == null || member.hubunganKk == 'Not Set') {
+          errors.add("Hubungan dengan KK untuk $name wajib diisi.");
+        }
+        if (member.tglLahir == null || member.tglLahir!.trim().isEmpty) {
+          errors.add("Tanggal Lahir untuk $name wajib diisi.");
+        }
+      }
+
+      if (duplicateNiks.isNotEmpty) {
+        errors.add("Terdapat NIK anggota keluarga yang sama / duplikat: ${duplicateNiks.join(', ')}. Setiap NIK harus unik.");
+      }
+
+      // Validasi hubungan dengan KK: Harus ada tepat 1 Kepala Keluarga
+      final kkMembers = familyMembers.where((m) => m.hubunganKk == 'Kepala Keluarga' || m.hubunganKk == '1').toList();
+      if (kkMembers.isEmpty) {
+        errors.add("Harus ada minimal satu anggota keluarga dengan hubungan sebagai 'Kepala Keluarga'.");
+      } else if (kkMembers.length > 1) {
+        errors.add("Dalam satu keluarga hanya boleh ada 1 'Kepala Keluarga'. Ditemukan ${kkMembers.length} kepala keluarga.");
+      }
+    }
+
+    return errors;
+  }
+
+  bool isStepValid(int step) {
+    if (step == 0) {
+      if (namaKk == null || namaKk!.trim().isEmpty) return false;
+      if (nikKk == null || nikKk!.trim().length != 16) return false;
+      if (noKk == null || noKk!.trim().length != 16) return false;
+      if (jmlAnggotaKk == null || jmlAnggotaKk! <= 0) return false;
+      if (provinsi == null || provinsi!.trim().isEmpty) return false;
+      if (kabupatenKota == null || kabupatenKota!.trim().isEmpty) return false;
+      if (kecamatan == null || kecamatan!.trim().isEmpty) return false;
+      if (desaKelurahan == null || desaKelurahan!.trim().isEmpty) return false;
+      if (namaSls == null || namaSls!.trim().isEmpty) return false;
+      return true;
+    } else if (step == 1) {
+      if (jmlKeluargaTinggal == null || jmlKeluargaTinggal! <= 0) return false;
+      if (jenisBangunan == null || jenisBangunan!.trim().isEmpty || jenisBangunan == 'Not Set') return false;
+      if (statusKepemilikan == null || statusKepemilikan!.trim().isEmpty || statusKepemilikan == 'Not Set') return false;
+      if (sumberAirMinum == null || sumberAirMinum!.trim().isEmpty || sumberAirMinum == 'Not Set') return false;
+      if (sumberPenerangan == null || sumberPenerangan!.trim().isEmpty || sumberPenerangan == 'Not Set') return false;
+      return true;
+    } else if (step == 2) {
+      return true;
+    } else if (step == 3) {
+      if (familyMembers.isEmpty) return false;
+      final Set<String> niks = {};
+      for (var member in familyMembers) {
+        if (member.nama.trim().isEmpty) return false;
+        if (member.nik == null || member.nik!.trim().length != 16) return false;
+        
+        final cleanNik = member.nik!.trim();
+        if (niks.contains(cleanNik)) return false;
+        niks.add(cleanNik);
+
+        if (member.jenisKelamin == null || member.jenisKelamin == 'Not Set') return false;
+        if (member.hubunganKk == null || member.hubunganKk == 'Not Set') return false;
+        if (member.tglLahir == null || member.tglLahir!.trim().isEmpty) return false;
+      }
+      final kkCount = familyMembers.where((m) => m.hubunganKk == 'Kepala Keluarga' || m.hubunganKk == '1').length;
+      if (kkCount != 1) return false;
+      return true;
+    }
+    return true;
   }
 }
 

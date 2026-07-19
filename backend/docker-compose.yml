@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: descan-postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: descan2026
+      POSTGRES_DB: form_descan
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d form_descan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: descan-backend-api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:descan2026@db:5432/form_descan
+      JWT_SECRET: b393264a4e07304763b0e8b43e820f5647f4780b61a529fada633d45e071ddb1
+      DB_SSL: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npm run db:push && npm run db:seed && npm start"
+
+volumes:
+  pgdata:
+    driver: local

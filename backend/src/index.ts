@@ -3,99 +3,65 @@ import cors from 'cors';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { supabase } from './db/supabase.js';
+import { eq, asc } from 'drizzle-orm';
+import { db } from './db/drizzle.js';
+import { users, surveys, familyMembers, wilayahSangihe } from './db/schema.js';
 import { requireAuth, AuthenticatedRequest } from './middleware/auth.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET || '';
+const JWT_SECRET = process.env.JWT_SECRET || '';
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Support base64 image strings if needed
+app.use(express.json({ limit: '10mb' }));
 
-// Handle cPanel subpath passenger proxying (e.g. /backend-form prefix)
+// Handle cPanel subpath proxying
 app.use((req, res, next) => {
   if (req.url.startsWith('/backend-form')) {
-    req.url = req.url.substring('/backend-form'.length);
-    if (req.url === '') req.url = '/';
+    req.url = req.url.substring('/backend-form'.length) || '/';
   }
   next();
 });
 
-// Helper functions for mapping JSON keys between camelCase (Flutter) and snake_case (Postgres DB)
-function camelToSnake(str: string): string {
-  return str
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/([a-zA-Z])([0-9])/g, '$1_$2')
-    .toLowerCase();
-}
-
-function snakeToCamel(str: string): string {
-  return str.replace(/_([a-zA-Z0-9])/g, (_, letter) => letter.toUpperCase());
-}
-
-function mapKeys(obj: any, fn: (str: string) => string): any {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) {
-    return obj.map(item => mapKeys(item, fn));
-  }
-  if (typeof obj === 'object') {
-    return Object.keys(obj).reduce((acc: any, key) => {
-      const val = obj[key];
-      const newKey = fn(key);
-      acc[newKey] = mapKeys(val, fn);
-      return acc;
-    }, {});
-  }
-  return obj;
-}
-
-// Healthcheck
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Public Auth Endpoints
+// ── Auth ───────────────────────────────────────────────────────────────────
+
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, desa, kecamatan, kabupaten } = req.body;
-
+    const { email, password, desa, kecamatan, kabupaten, nama, role } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Check if user already exists
-    const { data: existing, error: selectError } = await supabase
-      .from('form-descan-users')
-      .select('id')
-      .eq('email', email)
-      .limit(1);
-
-    if (selectError) throw selectError;
-
-    if (existing && existing.length > 0) {
+    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (existing.length > 0) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
 
-    // Insert user
-    const { error: insertError } = await supabase
-      .from('form-descan-users')
-      .insert({
-        id: userId,
-        email,
-        password: hashedPassword,
-        desa: desa || '',
-        kecamatan: kecamatan || '',
-        kabupaten: kabupaten || '',
-      });
+    const emailPrefix = email.split('@')[0] || '';
+    const nameParts = emailPrefix.split('.');
+    const defaultNama = nameParts
+      .map((p: string) => p.length === 0 ? '' : p[0].toUpperCase() + p.substring(1))
+      .join(' ');
 
-    if (insertError) throw insertError;
+    await db.insert(users).values({
+      id: userId,
+      email,
+      password: hashedPassword,
+      desa: desa || '',
+      kecamatan: kecamatan || '',
+      kabupaten: kabupaten || '',
+      nama: nama || defaultNama,
+      role: role || 'Pencacah',
+    });
 
     res.status(201).json({ message: 'User registered successfully', userId });
   } catch (error: any) {
@@ -107,59 +73,35 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Find user
-    const { data: existing, error: selectError } = await supabase
-      .from('form-descan-users')
-      .select('*')
-      .eq('email', email)
-      .limit(1);
-
-    if (selectError) throw selectError;
-
-    if (!existing || existing.length === 0) {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (result.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const user = existing[0];
-
-    // Check password
+    const user = result[0];
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     if (!JWT_SECRET) {
-      console.error('ERROR: JWT_SECRET or SUPABASE_JWT_SECRET is not configured on the server.');
+      console.error('ERROR: JWT_SECRET is not configured.');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    // Sign JWT
     const token = jwt.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        desa: user.desa,
-        kecamatan: user.kecamatan,
-        kabupaten: user.kabupaten,
-      },
+      { sub: user.id, email: user.email, desa: user.desa, kecamatan: user.kecamatan, kabupaten: user.kabupaten, nama: user.nama, role: user.role },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
     res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        desa: user.desa,
-        kecamatan: user.kecamatan,
-        kabupaten: user.kabupaten,
-      }
+      user: { id: user.id, email: user.email, desa: user.desa, kecamatan: user.kecamatan, kabupaten: user.kabupaten, nama: user.nama, role: user.role },
     });
   } catch (error: any) {
     console.error('Login Error:', error);
@@ -167,128 +109,105 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Secure Survey Endpoints
+// ── Protected routes ───────────────────────────────────────────────────────
+
 app.use('/api', requireAuth);
 
-// 0. Get user profile details
 app.get('/api/profile', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.sub;
     if (!userId) return res.status(401).json({ error: 'User ID missing from token' });
 
-    const { data: result, error: selectError } = await supabase
-      .from('form-descan-users')
-      .select('*')
-      .eq('id', userId)
-      .limit(1);
+    const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (result.length === 0) return res.status(404).json({ error: 'Profile not found' });
 
-    if (selectError) throw selectError;
-
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'Profile not found' });
-    }
-    
-    // Map back to camelCase for client
-    res.json(mapKeys(result[0], snakeToCamel));
+    const { password: _pw, ...profile } = result[0];
+    res.json(profile);
   } catch (error: any) {
-    console.error('Error fetching profile:', error);
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
-// Update/Create user profile
 app.post('/api/profile', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.sub;
     if (!userId) return res.status(401).json({ error: 'User ID missing from token' });
+    const { desa, kecamatan, kabupaten, nama, role } = req.body;
 
-    const { email, desa, kecamatan, kabupaten } = req.body;
+    const existing = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    if (existing.length > 0) {
+      const updateData: any = { 
+        desa: desa || '', 
+        kecamatan: kecamatan || '', 
+        kabupaten: kabupaten || '', 
+        updatedAt: new Date() 
+      };
+      if (nama !== undefined) updateData.nama = nama;
+      if (role !== undefined) updateData.role = role;
 
-    const { data: existing, error: selectError } = await supabase
-      .from('form-descan-users')
-      .select('id')
-      .eq('id', userId)
-      .limit(1);
-
-    if (selectError) throw selectError;
-
-    if (existing && existing.length > 0) {
-      const { error: updateError } = await supabase
-        .from('form-descan-users')
-        .update({
-          desa: desa || '',
-          kecamatan: kecamatan || '',
-          kabupaten: kabupaten || '',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
+      await db.update(users)
+        .set(updateData)
+        .where(eq(users.id, userId));
       res.json({ message: 'Profile updated successfully' });
     } else {
-      const { error: insertError } = await supabase
-        .from('form-descan-users')
-        .insert({
-          id: userId,
-          email: email || req.user?.email || '',
-          password: '', // Placeholder password, not usable for login
-          desa: desa || '',
-          kecamatan: kecamatan || '',
-          kabupaten: kabupaten || '',
-        });
+      const email = req.user?.email || '';
+      const emailPrefix = email.split('@')[0] || '';
+      const nameParts = emailPrefix.split('.');
+      const defaultNama = nameParts
+        .map((p: string) => p.length === 0 ? '' : p[0].toUpperCase() + p.substring(1))
+        .join(' ');
 
-      if (insertError) throw insertError;
+      await db.insert(users).values({
+        id: userId,
+        email: email,
+        password: '',
+        desa: desa || '',
+        kecamatan: kecamatan || '',
+        kabupaten: kabupaten || '',
+        nama: nama || defaultNama,
+        role: role || 'Pencacah',
+      });
       res.status(201).json({ message: 'Profile created successfully' });
     }
   } catch (error: any) {
-    console.error('Error saving profile:', error);
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
-// 1. Get all surveys for user
+app.get('/api/wilayah', async (req: AuthenticatedRequest, res) => {
+  try {
+    const list = await db.select().from(wilayahSangihe);
+    res.json(list);
+  } catch (error: any) {
+    console.error('Error fetching wilayah:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+});
+
 app.get('/api/surveys', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.sub;
     if (!userId) return res.status(401).json({ error: 'User ID missing from token' });
 
-    // Fetch surveys
-    const { data: userSurveys, error: surveysError } = await supabase
-      .from('form-descan-surveys')
-      .select('*')
-      .eq('user_id', userId);
+    const userSurveys = await db.select().from(surveys).where(eq(surveys.userId, userId));
 
-    if (surveysError) throw surveysError;
-
-    // Fetch family members for each survey
-    const result = [];
-    if (userSurveys) {
-      for (const survey of userSurveys) {
-        const { data: members, error: membersError } = await supabase
-          .from('form-descan-family_members')
-          .select('*')
-          .eq('survey_id', survey.id)
-          .order('no_urut', { ascending: true });
-
-        if (membersError) throw membersError;
-
-        result.push(
-          mapKeys({
-            ...survey,
-            familyMembers: members || [],
-          }, snakeToCamel)
-        );
-      }
-    }
+    const result = await Promise.all(
+      userSurveys.map(async (survey) => {
+        const members = await db
+          .select()
+          .from(familyMembers)
+          .where(eq(familyMembers.surveyId, survey.id))
+          .orderBy(asc(familyMembers.noUrut));
+        return { ...survey, familyMembers: members };
+      })
+    );
 
     res.json(result);
   } catch (error: any) {
-    console.error('Error fetching surveys:', error);
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
-// 2. Create survey with family members
 app.post('/api/surveys', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.sub;
@@ -297,37 +216,12 @@ app.post('/api/surveys', async (req: AuthenticatedRequest, res) => {
     const { familyMembers: membersData, ...surveyData } = req.body;
     const surveyId = surveyData.id || crypto.randomUUID();
 
-    // Map keys to snake_case
-    const dbSurveyData = mapKeys({
-      ...surveyData,
-      id: surveyId,
-      userId: userId,
-    }, camelToSnake);
+    await db.insert(surveys).values({ ...surveyData, id: surveyId, userId });
 
-    // 1. Insert survey
-    const { error: surveyError } = await supabase
-      .from('form-descan-surveys')
-      .insert(dbSurveyData);
-
-    if (surveyError) throw surveyError;
-
-    // 2. Insert family members
-    if (membersData && Array.isArray(membersData) && membersData.length > 0) {
-      const dbMembersData = membersData.map((member) => mapKeys({
-        ...member,
-        id: member.id || crypto.randomUUID(),
-        surveyId: surveyId,
-      }, camelToSnake));
-
-      const { error: membersError } = await supabase
-        .from('form-descan-family_members')
-        .insert(dbMembersData);
-
-      if (membersError) {
-        // Rollback survey insert to keep DB consistent
-        await supabase.from('form-descan-surveys').delete().eq('id', surveyId);
-        throw membersError;
-      }
+    if (Array.isArray(membersData) && membersData.length > 0) {
+      await db.insert(familyMembers).values(
+        membersData.map((m: any) => ({ ...m, id: m.id || crypto.randomUUID(), surveyId }))
+      );
     }
 
     res.status(201).json({ message: 'Survey created successfully', id: surveyId });
@@ -337,7 +231,6 @@ app.post('/api/surveys', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// 3. Update survey
 app.put('/api/surveys/:id', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.sub;
@@ -346,57 +239,17 @@ app.put('/api/surveys/:id', async (req: AuthenticatedRequest, res) => {
     const surveyId = req.params.id;
     const { familyMembers: membersData, ...surveyData } = req.body;
 
-    // Verify ownership
-    const { data: existing, error: selectError } = await supabase
-      .from('form-descan-surveys')
-      .select('user_id')
-      .eq('id', surveyId)
-      .limit(1);
+    const existing = await db.select({ userId: surveys.userId }).from(surveys).where(eq(surveys.id, surveyId)).limit(1);
+    if (existing.length === 0) return res.status(404).json({ error: 'Survey not found' });
+    if (existing[0].userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
-    if (selectError) throw selectError;
+    await db.update(surveys).set({ ...surveyData, updatedAt: new Date() }).where(eq(surveys.id, surveyId));
+    await db.delete(familyMembers).where(eq(familyMembers.surveyId, surveyId));
 
-    if (!existing || existing.length === 0) {
-      return res.status(404).json({ error: 'Survey not found' });
-    }
-    if (existing[0].user_id !== userId) {
-      return res.status(403).json({ error: 'Forbidden: You do not own this survey' });
-    }
-
-    // Map survey fields to snake_case
-    const dbSurveyData = mapKeys({
-      ...surveyData,
-      updatedAt: new Date().toISOString(),
-    }, camelToSnake);
-
-    // 1. Update survey fields
-    const { error: updateSurveyError } = await supabase
-      .from('form-descan-surveys')
-      .update(dbSurveyData)
-      .eq('id', surveyId);
-
-    if (updateSurveyError) throw updateSurveyError;
-
-    // 2. Delete existing members
-    const { error: deleteMembersError } = await supabase
-      .from('form-descan-family_members')
-      .delete()
-      .eq('survey_id', surveyId);
-
-    if (deleteMembersError) throw deleteMembersError;
-
-    // 3. Insert new member records
-    if (membersData && Array.isArray(membersData) && membersData.length > 0) {
-      const dbMembersData = membersData.map((member) => mapKeys({
-        ...member,
-        id: member.id || crypto.randomUUID(),
-        surveyId: surveyId,
-      }, camelToSnake));
-
-      const { error: insertMembersError } = await supabase
-        .from('form-descan-family_members')
-        .insert(dbMembersData);
-
-      if (insertMembersError) throw insertMembersError;
+    if (Array.isArray(membersData) && membersData.length > 0) {
+      await db.insert(familyMembers).values(
+        membersData.map((m: any) => ({ ...m, id: m.id || crypto.randomUUID(), surveyId }))
+      );
     }
 
     res.json({ message: 'Survey updated successfully', id: surveyId });
@@ -406,7 +259,6 @@ app.put('/api/surveys/:id', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// 4. Delete survey
 app.delete('/api/surveys/:id', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.sub;
@@ -414,37 +266,12 @@ app.delete('/api/surveys/:id', async (req: AuthenticatedRequest, res) => {
 
     const surveyId = req.params.id;
 
-    // Verify ownership
-    const { data: existing, error: selectError } = await supabase
-      .from('form-descan-surveys')
-      .select('user_id')
-      .eq('id', surveyId)
-      .limit(1);
+    const existing = await db.select({ userId: surveys.userId }).from(surveys).where(eq(surveys.id, surveyId)).limit(1);
+    if (existing.length === 0) return res.status(404).json({ error: 'Survey not found' });
+    if (existing[0].userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
-    if (selectError) throw selectError;
-
-    if (!existing || existing.length === 0) {
-      return res.status(404).json({ error: 'Survey not found' });
-    }
-    if (existing[0].user_id !== userId) {
-      return res.status(403).json({ error: 'Forbidden: You do not own this survey' });
-    }
-
-    // Delete members first
-    const { error: deleteMembersError } = await supabase
-      .from('form-descan-family_members')
-      .delete()
-      .eq('survey_id', surveyId);
-
-    if (deleteMembersError) throw deleteMembersError;
-
-    // Delete survey
-    const { error: deleteSurveyError } = await supabase
-      .from('form-descan-surveys')
-      .delete()
-      .eq('id', surveyId);
-
-    if (deleteSurveyError) throw deleteSurveyError;
+    await db.delete(familyMembers).where(eq(familyMembers.surveyId, surveyId));
+    await db.delete(surveys).where(eq(surveys.id, surveyId));
 
     res.json({ message: 'Survey deleted successfully' });
   } catch (error: any) {
@@ -453,6 +280,6 @@ app.delete('/api/surveys/:id', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(Number(port), '0.0.0.0', () => {
+  console.log(`Server running on port ${port} (Listening on all interfaces)`);
 });

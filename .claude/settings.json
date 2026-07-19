@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "PowerShell(docker --version)",
+      "PowerShell(docker exec form-descan-postgres pg_isready -U postgres)",
+      "PowerShell(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "PowerShell(docker exec form-descan-postgres psql -U postgres -d form_descan -c \"\\\\l\")",
+      "PowerShell(docker context ls)",
+      "PowerShell(docker context use default)",
+      "PowerShell(docker version 2>&1)",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue)",
+      "PowerShell(cd d:\\\\Hamdani\\\\form-descan\\\\backend; $env:DATABASE_URL=\"postgresql://postgres:descan2026@localhost:5432/form_descan\"; npx drizzle-kit push --force 2>&1)",
+      "PowerShell(docker exec form-descan-postgres psql -U postgres -d form_descan -c \"\\\\dt\")",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/health\")"
+    ]
+  }
+}

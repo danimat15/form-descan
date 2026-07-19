@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/survey_provider.dart';
 import '../models/survey_model.dart';
+import 'form_helpers.dart';
 
 class MemberDetailDialog extends StatefulWidget {
   final String memberId;
@@ -14,6 +15,7 @@ class MemberDetailDialog extends StatefulWidget {
 class _MemberDetailDialogState extends State<MemberDetailDialog> {
   final _formKey = GlobalKey<FormState>();
   late FamilyMemberModel _tempMember;
+  late TextEditingController _dobController;
 
   @override
   void initState() {
@@ -24,6 +26,13 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
     
     // Create a copy of the member so edits are transactional
     _tempMember = FamilyMemberModel.fromJson(member.toJson());
+    _dobController = TextEditingController(text: _tempMember.tglLahir);
+  }
+
+  @override
+  void dispose() {
+    _dobController.dispose();
+    super.dispose();
   }
 
   int _calculateAge(String? dob) {
@@ -44,89 +53,133 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
     return currentYear - year;
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    DateTime initialDate = DateTime.now();
+    if (_tempMember.tglLahir != null && _tempMember.tglLahir!.isNotEmpty) {
+      final parts = _tempMember.tglLahir!.split('/');
+      if (parts.length == 3) {
+        final day = int.tryParse(parts[0]) ?? 1;
+        final month = int.tryParse(parts[1]) ?? 1;
+        int year = int.tryParse(parts[2]) ?? 2000;
+        if (year < 100) {
+          year += (year > 26 ? 1900 : 2000);
+        }
+        initialDate = DateTime(year, month, day);
+      }
+    }
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      final dayStr = picked.day.toString().padLeft(2, '0');
+      final monthStr = picked.month.toString().padLeft(2, '0');
+      final yearStr = picked.year.toString();
+      final formatted = '$dayStr/$monthStr/$yearStr';
+      setState(() {
+        _tempMember.tglLahir = formatted;
+        _dobController.text = formatted;
+      });
+    }
+  }
+
+  void _saveData() {
+    final provider = Provider.of<SurveyProvider>(context, listen: false);
+    provider.updateFamilyMember(widget.memberId, (member) {
+      // Copy fields back to provider member
+      final jsonCopy = _tempMember.toJson();
+      final updated = FamilyMemberModel.fromJson(jsonCopy);
+      member.nama = updated.nama;
+      member.nik = updated.nik;
+      member.noHp = updated.noHp;
+      member.keberadaan = updated.keberadaan;
+      member.alamatDomisili = updated.alamatDomisili;
+      member.provinsiDomisili = updated.provinsiDomisili;
+      member.kabupatenDomisili = updated.kabupatenDomisili;
+      member.negaraDomisili = updated.negaraDomisili;
+      member.jenisKelamin = updated.jenisKelamin;
+      member.tglLahir = updated.tglLahir;
+      member.statusKawin = updated.statusKawin;
+      member.hubunganKk = updated.hubunganKk;
+      member.partisipasiSekolah = updated.partisipasiSekolah;
+      member.ijazahTertinggi = updated.ijazahTertinggi;
+      member.gaji = updated.gaji;
+      member.tunjangan = updated.tunjangan;
+      member.uangMakan = updated.uangMakan;
+      member.honor = updated.honor;
+      member.lembur = updated.lembur;
+      member.pendapatanLain = updated.pendapatanLain;
+      member.totalPendapatan = updated.totalPendapatan;
+      member.pendapatanUsaha = updated.pendapatanUsaha;
+      member.pendapatanPassive = updated.pendapatanPassive;
+      member.profesi = updated.profesi;
+      member.statusPekerjaan = updated.statusPekerjaan;
+      
+      // Disabilitas
+      member.disabilitasFisik = updated.disabilitasFisik;
+      member.disabilitasMental = updated.disabilitasMental;
+      member.disabilitasIntelektual = updated.disabilitasIntelektual;
+      member.disabilitasNetra = updated.disabilitasNetra;
+      member.disabilitasRungu = updated.disabilitasRungu;
+      member.disabilitasWicara = updated.disabilitasWicara;
+
+      // Penyakit
+      member.hipertensi = updated.hipertensi;
+      member.rematik = updated.rematik;
+      member.asma = updated.asma;
+      member.jantung = updated.jantung;
+      member.diabetes = updated.diabetes;
+      member.tbc = updated.tbc;
+      member.stroke = updated.stroke;
+      member.kanker = updated.kanker;
+      member.ginjal = updated.ginjal;
+      member.hemofilia = updated.hemofilia;
+      member.hiv = updated.hiv;
+      member.kolesterol = updated.kolesterol;
+      member.sirosis = updated.sirosis;
+      member.talasemia = updated.talasemia;
+      member.leukemia = updated.leukemia;
+      member.alzheimer = updated.alzheimer;
+      member.sakitLainnya = updated.sakitLainnya;
+
+      member.rekeningDigital = updated.rekeningDigital;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final age = _calculateAge(_tempMember.tglLahir);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_tempMember.nama.isNotEmpty ? 'Edit: ${_tempMember.nama}' : 'Add Member Details'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          TextButton(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _saveData();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_tempMember.nama.isNotEmpty ? 'Ubah Rincian: ${_tempMember.nama}' : 'Tambah Rincian Anggota'),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
             onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                final provider = Provider.of<SurveyProvider>(context, listen: false);
-                provider.updateFamilyMember(widget.memberId, (member) {
-                  // Copy fields back to provider member
-                  final jsonCopy = _tempMember.toJson();
-                  final updated = FamilyMemberModel.fromJson(jsonCopy);
-                  member.nama = updated.nama;
-                  member.nik = updated.nik;
-                  member.noHp = updated.noHp;
-                  member.keberadaan = updated.keberadaan;
-                  member.alamatDomisili = updated.alamatDomisili;
-                  member.provinsiDomisili = updated.provinsiDomisili;
-                  member.kabupatenDomisili = updated.kabupatenDomisili;
-                  member.negaraDomisili = updated.negaraDomisili;
-                  member.jenisKelamin = updated.jenisKelamin;
-                  member.tglLahir = updated.tglLahir;
-                  member.statusKawin = updated.statusKawin;
-                  member.hubunganKk = updated.hubunganKk;
-                  member.partisipasiSekolah = updated.partisipasiSekolah;
-                  member.ijazahTertinggi = updated.ijazahTertinggi;
-                  member.gaji = updated.gaji;
-                  member.tunjangan = updated.tunjangan;
-                  member.uangMakan = updated.uangMakan;
-                  member.honor = updated.honor;
-                  member.lembur = updated.lembur;
-                  member.pendapatanLain = updated.pendapatanLain;
-                  member.totalPendapatan = updated.totalPendapatan;
-                  member.pendapatanUsaha = updated.pendapatanUsaha;
-                  member.pendapatanPassive = updated.pendapatanPassive;
-                  member.profesi = updated.profesi;
-                  member.statusPekerjaan = updated.statusPekerjaan;
-                  
-                  // Disabilitas
-                  member.disabilitasFisik = updated.disabilitasFisik;
-                  member.disabilitasMental = updated.disabilitasMental;
-                  member.disabilitasIntelektual = updated.disabilitasIntelektual;
-                  member.disabilitasNetra = updated.disabilitasNetra;
-                  member.disabilitasRungu = updated.disabilitasRungu;
-                  member.disabilitasWicara = updated.disabilitasWicara;
-
-                  // Penyakit
-                  member.hipertensi = updated.hipertensi;
-                  member.rematik = updated.rematik;
-                  member.asma = updated.asma;
-                  member.jantung = updated.jantung;
-                  member.diabetes = updated.diabetes;
-                  member.tbc = updated.tbc;
-                  member.stroke = updated.stroke;
-                  member.kanker = updated.kanker;
-                  member.ginjal = updated.ginjal;
-                  member.hemofilia = updated.hemofilia;
-                  member.hiv = updated.hiv;
-                  member.kolesterol = updated.kolesterol;
-                  member.sirosis = updated.sirosis;
-                  member.talasemia = updated.talasemia;
-                  member.leukemia = updated.leukemia;
-                  member.alzheimer = updated.alzheimer;
-                  member.sakitLainnya = updated.sakitLainnya;
-
-                  member.rekeningDigital = updated.rekeningDigital;
-                });
-                Navigator.pop(context);
-              }
+              _saveData();
+              Navigator.pop(context);
             },
-            child: const Text('SAVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _saveData();
+                Navigator.pop(context);
+              },
+              child: const Text('SIMPAN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -141,37 +194,67 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
               const SizedBox(height: 16),
 
               // 25. Nama Anggota Keluarga
-              TextFormField(
-                initialValue: _tempMember.nama,
-                decoration: const InputDecoration(labelText: '25. Nama Anggota Keluarga'),
+              _buildTextFormField(
+                label: '25. Nama Anggota Keluarga *',
+                value: _tempMember.nama,
                 validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
                 onChanged: (val) => setState(() => _tempMember.nama = val),
               ),
-              const SizedBox(height: 16),
 
               // 26.a NIK
-              TextFormField(
-                initialValue: _tempMember.nik,
+              _buildTextFormField(
+                label: '26. a. NIK (Nomor Induk Kependudukan) *',
+                value: _tempMember.nik,
                 keyboardType: TextInputType.number,
                 maxLength: 16,
-                decoration: const InputDecoration(labelText: '26. a. NIK (Nomor Induk Kependudukan)', counterText: ''),
                 validator: (val) => val != null && val.isNotEmpty && val.length != 16 ? 'NIK must be 16 digits' : null,
                 onChanged: (val) => setState(() => _tempMember.nik = val),
               ),
-              const SizedBox(height: 16),
 
               // 26.b Nomor HP
-              TextFormField(
-                initialValue: _tempMember.noHp,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: '26. b. Nomor Telepon/HP'),
-                onChanged: (val) => setState(() => _tempMember.noHp = val),
-              ),
-              const SizedBox(height: 16),
+              (() {
+                final displayValue = _tempMember.noHp != null && _tempMember.noHp!.startsWith('+62')
+                    ? _tempMember.noHp!.substring(3)
+                    : (_tempMember.noHp != null && _tempMember.noHp!.startsWith('0')
+                        ? _tempMember.noHp!.substring(1)
+                        : _tempMember.noHp ?? '');
+                return _buildTextFormField(
+                  label: '26. b. Nomor Telepon/HP',
+                  value: displayValue,
+                  prefixText: '+62 ',
+                  keyboardType: TextInputType.number,
+                  maxLength: 13,
+                  validator: (val) {
+                    if (val != null && val.isNotEmpty) {
+                      if (val.length < 9) {
+                        return 'Nomor HP minimal 9 digit (setelah +62)';
+                      }
+                      if (!RegExp(r'^[0-9]+$').hasMatch(val)) {
+                        return 'Nomor HP harus berupa angka saja';
+                      }
+                    }
+                    return null;
+                  },
+                  onChanged: (val) {
+                    setState(() {
+                      if (val.trim().isEmpty) {
+                        _tempMember.noHp = null;
+                      } else {
+                        // strip any leading 0 if typed
+                        String cleanVal = val.trim();
+                        if (cleanVal.startsWith('0')) {
+                          cleanVal = cleanVal.substring(1);
+                        }
+                        _tempMember.noHp = '+62$cleanVal';
+                      }
+                    });
+                  },
+                );
+              }()),
 
               // 27.a Keberadaan
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: '27. a. Keberadaan anggota keluarga'),
+              _buildDropdownButtonFormField<String>(
+                label: '27. a. Keberadaan anggota keluarga',
                 value: _tempMember.keberadaan,
                 items: const [
                   DropdownMenuItem(value: '1', child: Text('1. Tinggal di rumah/tempat tinggal ini')),
@@ -184,11 +267,10 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                 ],
                 onChanged: (val) => setState(() => _tempMember.keberadaan = val),
               ),
-              const SizedBox(height: 16),
 
               // 27.b Alamat Domisili
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: '27. b. Alamat Domisili'),
+              _buildDropdownButtonFormField<String>(
+                label: '27. b. Alamat Domisili',
                 value: _tempMember.alamatDomisili,
                 items: const [
                   DropdownMenuItem(value: '1', child: Text('1. Sesuai KK dan KTP')),
@@ -198,84 +280,86 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                 ],
                 onChanged: (val) => setState(() => _tempMember.alamatDomisili = val),
               ),
-              const SizedBox(height: 16),
 
               // 28DN Provinsi/Kabupaten Domisili (If Keberadaan == 3)
               if (_tempMember.keberadaan == '3') ...[
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        initialValue: _tempMember.provinsiDomisili,
-                        decoration: const InputDecoration(labelText: '28DN. a. Provinsi Domisili'),
+                      child: _buildTextFormField(
+                        label: '28DN. a. Provinsi Domisili',
+                        value: _tempMember.provinsiDomisili,
                         onChanged: (val) => setState(() => _tempMember.provinsiDomisili = val),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: TextFormField(
-                        initialValue: _tempMember.kabupatenDomisili,
-                        decoration: const InputDecoration(labelText: '28DN. b. Kabupaten/Kota Domisili'),
+                      child: _buildTextFormField(
+                        label: '28DN. b. Kabupaten/Kota Domisili',
+                        value: _tempMember.kabupatenDomisili,
                         onChanged: (val) => setState(() => _tempMember.kabupatenDomisili = val),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
               ],
 
               // 28LN Negara Domisili (If Keberadaan == 4)
               if (_tempMember.keberadaan == '4') ...[
-                TextFormField(
-                  initialValue: _tempMember.negaraDomisili,
-                  decoration: const InputDecoration(labelText: '28LN. Negara Domisili'),
+                _buildTextFormField(
+                  label: '28LN. Negara Domisili',
+                  value: _tempMember.negaraDomisili,
                   onChanged: (val) => setState(() => _tempMember.negaraDomisili = val),
                 ),
-                const SizedBox(height: 16),
               ],
 
-              // 29 Jenis Kelamin & 30 Tanggal Lahir
+              // 29 Jenis Kelamin
+              _buildDropdownButtonFormField<String>(
+                label: '29. Jenis Kelamin *',
+                value: _tempMember.jenisKelamin,
+                items: const [
+                  DropdownMenuItem(value: '1', child: Text('1. Laki-laki')),
+                  DropdownMenuItem(value: '2', child: Text('2. Perempuan')),
+                ],
+                onChanged: (val) => setState(() => _tempMember.jenisKelamin = val),
+              ),
+
+              // 30 Tanggal lahir
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const FormLabel('30. Tanggal lahir *'),
+                  TextFormField(
+                    controller: _dobController,
+                    keyboardType: TextInputType.datetime,
+                    decoration: getFormDecoration(
+                      value: _tempMember.tglLahir,
+                      hintText: 'DD/MM/YYYY (Contoh: 17/08/1945)',
+                    ).copyWith(
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today),
+                        onPressed: () => _selectDate(context),
+                      ),
+                    ),
+                    validator: (val) => val == null || val.isEmpty ? 'Tanggal lahir wajib diisi' : null,
+                    onChanged: (val) {
+                      setState(() {
+                        _tempMember.tglLahir = val;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+
+              // 31 Status Perkawinan & 32 Hubungan KK
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: '29. Jenis Kelamin'),
-                      value: _tempMember.jenisKelamin,
-                      items: const [
-                        DropdownMenuItem(value: '1', child: Text('1. Laki-laki')),
-                        DropdownMenuItem(value: '2', child: Text('2. Perempuan')),
-                      ],
-                      onChanged: (val) => setState(() => _tempMember.jenisKelamin = val),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: _tempMember.tglLahir,
-                      keyboardType: TextInputType.datetime,
-                      decoration: const InputDecoration(
-                        labelText: '30. Tanggal lahir',
-                        hintText: 'DD/MM/YY',
-                      ),
-                      validator: (val) => val == null || val.isEmpty ? 'DOB is required' : null,
-                      onChanged: (val) {
-                        setState(() {
-                          _tempMember.tglLahir = val;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // 31 Status Perkawinan & 32 Hubungan KK
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: '31. Status Kawin'),
+                    child: _buildDropdownButtonFormField<String>(
+                      label: '31. Status Kawin',
                       value: _tempMember.statusKawin,
                       items: const [
                         DropdownMenuItem(value: '1', child: Text('1. Belum Kawin')),
@@ -288,8 +372,8 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: '32. Hubungan KK'),
+                    child: _buildDropdownButtonFormField<String>(
+                      label: '32. Hubungan KK *',
                       value: _tempMember.hubunganKk,
                       items: const [
                         DropdownMenuItem(value: '1', child: Text('1. Kepala Keluarga')),
@@ -316,8 +400,8 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                   style: theme.textTheme.titleMedium?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: '33. Partisipasi Sekolah'),
+                _buildDropdownButtonFormField<String>(
+                  label: '33. Partisipasi Sekolah',
                   value: _tempMember.partisipasiSekolah,
                   items: const [
                     DropdownMenuItem(value: '0', child: Text('0. Tidak/Belum Pernah Sekolah')),
@@ -326,9 +410,8 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                   ],
                   onChanged: (val) => setState(() => _tempMember.partisipasiSekolah = val),
                 ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: '34. Ijazah/STTB Tertinggi'),
+                _buildDropdownButtonFormField<String>(
+                  label: '34. Ijazah/STTB Tertinggi',
                   value: _tempMember.ijazahTertinggi,
                   items: const [
                     DropdownMenuItem(value: '0', child: Text('0. Tidak punya ijazah SD')),
@@ -354,23 +437,18 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                 
                 // Income fields
                 _buildIncomeField('35. a. Gaji Utama', _tempMember.gaji, (val) => setState(() => _tempMember.gaji = val)),
-                const SizedBox(height: 12),
                 _buildIncomeField('b. Tunjangan', _tempMember.tunjangan, (val) => setState(() => _tempMember.tunjangan = val)),
-                const SizedBox(height: 12),
                 _buildIncomeField('c. Uang Makan', _tempMember.uangMakan, (val) => setState(() => _tempMember.uangMakan = val)),
-                const SizedBox(height: 12),
                 _buildIncomeField('d. Honor', _tempMember.honor, (val) => setState(() => _tempMember.honor = val)),
-                const SizedBox(height: 12),
                 _buildIncomeField('e. Lembur', _tempMember.lembur, (val) => setState(() => _tempMember.lembur = val)),
-                const SizedBox(height: 12),
                 _buildIncomeField('f. Lainnya', _tempMember.pendapatanLain, (val) => setState(() => _tempMember.pendapatanLain = val)),
                 
-                const SizedBox(height: 16),
-                
                 // Total Income Autofill Display
+                const FormLabel('Total Pendapatan Pekerjaan (Autofill)'),
                 TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Total Pendapatan Pekerjaan (Autofill)',
+                  decoration: getFormDecoration(
+                    value: _calculateTotalIncome(),
+                    isAutofill: true,
                     prefixText: 'Rp. ',
                   ),
                   readOnly: true,
@@ -379,24 +457,19 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                 const SizedBox(height: 16),
 
                 _buildIncomeField('35. b. Pendapatan dari Usaha (Warung/Affiliate/etc.)', _tempMember.pendapatanUsaha, (val) => setState(() => _tempMember.pendapatanUsaha = val)),
-                const SizedBox(height: 16),
                 _buildIncomeField('35. c. Pendapatan Lain (Pensiunan/Passive/etc.)', _tempMember.pendapatanPassive, (val) => setState(() => _tempMember.pendapatanPassive = val)),
-                const SizedBox(height: 16),
 
                 // Profesi
-                TextFormField(
-                  initialValue: _tempMember.profesi,
-                  decoration: const InputDecoration(
-                    labelText: '36. Profesi Pekerjaan Utama',
-                    helperText: 'Jika tidak bekerja, tulis strip (-)',
-                  ),
+                _buildTextFormField(
+                  label: '36. Profesi Pekerjaan Utama',
+                  value: _tempMember.profesi,
+                  helperText: 'Jika tidak bekerja, tulis strip (-)',
                   onChanged: (val) => setState(() => _tempMember.profesi = val),
                 ),
-                const SizedBox(height: 16),
 
                 // Status Kedudukan
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: '37. Status Kedudukan Pekerjaan Utama'),
+                _buildDropdownButtonFormField<String>(
+                  label: '37. Status Kedudukan Pekerjaan Utama',
                   value: _tempMember.statusPekerjaan,
                   items: const [
                     DropdownMenuItem(value: '1', child: Text('1. Berusaha sendiri')),
@@ -418,12 +491,12 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                 style: theme.textTheme.titleMedium?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              _buildDisabilitySwitch('Disabilitas Fisik', _tempMember.disabilitasFisik, (val) => setState(() => _tempMember.disabilitasFisik = val)),
-              _buildDisabilitySwitch('Disabilitas Mental', _tempMember.disabilitasMental, (val) => setState(() => _tempMember.disabilitasMental = val)),
-              _buildDisabilitySwitch('Disabilitas Intelektual', _tempMember.disabilitasIntelektual, (val) => setState(() => _tempMember.disabilitasIntelektual = val)),
-              _buildDisabilitySwitch('Disabilitas Sensorik Netra', _tempMember.disabilitasNetra, (val) => setState(() => _tempMember.disabilitasNetra = val)),
-              _buildDisabilitySwitch('Disabilitas Sensorik Rungu', _tempMember.disabilitasRungu, (val) => setState(() => _tempMember.disabilitasRungu = val)),
-              _buildDisabilitySwitch('Disabilitas Sensorik Wicara', _tempMember.disabilitasWicara, (val) => setState(() => _tempMember.disabilitasWicara = val)),
+              _buildDisabilityRadio('Disabilitas Fisik', _tempMember.disabilitasFisik, (val) => setState(() => _tempMember.disabilitasFisik = val)),
+              _buildDisabilityRadio('Disabilitas Mental', _tempMember.disabilitasMental, (val) => setState(() => _tempMember.disabilitasMental = val)),
+              _buildDisabilityRadio('Disabilitas Intelektual', _tempMember.disabilitasIntelektual, (val) => setState(() => _tempMember.disabilitasIntelektual = val)),
+              _buildDisabilityRadio('Disabilitas Sensorik Netra', _tempMember.disabilitasNetra, (val) => setState(() => _tempMember.disabilitasNetra = val)),
+              _buildDisabilityRadio('Disabilitas Sensorik Rungu', _tempMember.disabilitasRungu, (val) => setState(() => _tempMember.disabilitasRungu = val)),
+              _buildDisabilityRadio('Disabilitas Sensorik Wicara', _tempMember.disabilitasWicara, (val) => setState(() => _tempMember.disabilitasWicara = val)),
               
               const Divider(height: 48),
 
@@ -433,23 +506,23 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                 style: theme.textTheme.titleMedium?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              _buildDisabilitySwitch('Hipertensi', _tempMember.hipertensi, (val) => setState(() => _tempMember.hipertensi = val)),
-              _buildDisabilitySwitch('Rematik', _tempMember.rematik, (val) => setState(() => _tempMember.rematik = val)),
-              _buildDisabilitySwitch('Asma', _tempMember.asma, (val) => setState(() => _tempMember.asma = val)),
-              _buildDisabilitySwitch('Masalah Jantung', _tempMember.jantung, (val) => setState(() => _tempMember.jantung = val)),
-              _buildDisabilitySwitch('Diabetes (Kencing Manis)', _tempMember.diabetes, (val) => setState(() => _tempMember.diabetes = val)),
-              _buildDisabilitySwitch('Tuberkulosis (TBC)', _tempMember.tbc, (val) => setState(() => _tempMember.tbc = val)),
-              _buildDisabilitySwitch('Stroke', _tempMember.stroke, (val) => setState(() => _tempMember.stroke = val)),
-              _buildDisabilitySwitch('Kanker / Tumor Ganas', _tempMember.kanker, (val) => setState(() => _tempMember.kanker = val)),
-              _buildDisabilitySwitch('Gagal Ginjal', _tempMember.ginjal, (val) => setState(() => _tempMember.ginjal = val)),
-              _buildDisabilitySwitch('Hemofilia', _tempMember.hemofilia, (val) => setState(() => _tempMember.hemofilia = val)),
-              _buildDisabilitySwitch('HIV/AIDS', _tempMember.hiv, (val) => setState(() => _tempMember.hiv = val)),
-              _buildDisabilitySwitch('Kolesterol', _tempMember.kolesterol, (val) => setState(() => _tempMember.kolesterol = val)),
-              _buildDisabilitySwitch('Sirosis Hati', _tempMember.sirosis, (val) => setState(() => _tempMember.sirosis = val)),
-              _buildDisabilitySwitch('Talasemia', _tempMember.talasemia, (val) => setState(() => _tempMember.talasemia = val)),
-              _buildDisabilitySwitch('Leukemia', _tempMember.leukemia, (val) => setState(() => _tempMember.leukemia = val)),
-              _buildDisabilitySwitch('Alzheimer', _tempMember.alzheimer, (val) => setState(() => _tempMember.alzheimer = val)),
-              _buildDisabilitySwitch('Lainnya', _tempMember.sakitLainnya, (val) => setState(() => _tempMember.sakitLainnya = val)),
+              _buildDisabilityRadio('Hipertensi', _tempMember.hipertensi, (val) => setState(() => _tempMember.hipertensi = val)),
+              _buildDisabilityRadio('Rematik', _tempMember.rematik, (val) => setState(() => _tempMember.rematik = val)),
+              _buildDisabilityRadio('Asma', _tempMember.asma, (val) => setState(() => _tempMember.asma = val)),
+              _buildDisabilityRadio('Masalah Jantung', _tempMember.jantung, (val) => setState(() => _tempMember.jantung = val)),
+              _buildDisabilityRadio('Diabetes (Kencing Manis)', _tempMember.diabetes, (val) => setState(() => _tempMember.diabetes = val)),
+              _buildDisabilityRadio('Tuberkulosis (TBC)', _tempMember.tbc, (val) => setState(() => _tempMember.tbc = val)),
+              _buildDisabilityRadio('Stroke', _tempMember.stroke, (val) => setState(() => _tempMember.stroke = val)),
+              _buildDisabilityRadio('Kanker / Tumor Ganas', _tempMember.kanker, (val) => setState(() => _tempMember.kanker = val)),
+              _buildDisabilityRadio('Gagal Ginjal', _tempMember.ginjal, (val) => setState(() => _tempMember.ginjal = val)),
+              _buildDisabilityRadio('Hemofilia', _tempMember.hemofilia, (val) => setState(() => _tempMember.hemofilia = val)),
+              _buildDisabilityRadio('HIV/AIDS', _tempMember.hiv, (val) => setState(() => _tempMember.hiv = val)),
+              _buildDisabilityRadio('Kolesterol', _tempMember.kolesterol, (val) => setState(() => _tempMember.kolesterol = val)),
+              _buildDisabilityRadio('Sirosis Hati', _tempMember.sirosis, (val) => setState(() => _tempMember.sirosis = val)),
+              _buildDisabilityRadio('Talasemia', _tempMember.talasemia, (val) => setState(() => _tempMember.talasemia = val)),
+              _buildDisabilityRadio('Leukemia', _tempMember.leukemia, (val) => setState(() => _tempMember.leukemia = val)),
+              _buildDisabilityRadio('Alzheimer', _tempMember.alzheimer, (val) => setState(() => _tempMember.alzheimer = val)),
+              _buildDisabilityRadio('Lainnya', _tempMember.sakitLainnya, (val) => setState(() => _tempMember.sakitLainnya = val)),
 
               const Divider(height: 48),
 
@@ -460,8 +533,8 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                   style: theme.textTheme.titleMedium?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Jenis Kepemilikan'),
+                _buildDropdownButtonFormField<String>(
+                  label: 'Jenis Kepemilikan',
                   value: _tempMember.rekeningDigital,
                   items: const [
                     DropdownMenuItem(value: '1', child: Text('1. Ya untuk usaha')),
@@ -472,51 +545,178 @@ class _MemberDetailDialogState extends State<MemberDetailDialog> {
                   ],
                   onChanged: (val) => setState(() => _tempMember.rekeningDigital = val),
                 ),
-                const SizedBox(height: 24),
               ],
             ],
           ),
         ),
       ),
+    ),
+  );
+}
+
+  Widget _buildTextFormField({
+    required String label,
+    required String? value,
+    required void Function(String) onChanged,
+    TextInputType keyboardType = TextInputType.text,
+    String? helperText,
+    String? prefixText,
+    String? suffixText,
+    int? maxLength,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label, helperText: helperText),
+        TextFormField(
+          initialValue: value,
+          keyboardType: keyboardType,
+          maxLength: maxLength,
+          decoration: getFormDecoration(
+            value: value,
+            prefixText: prefixText,
+            suffixText: suffixText,
+          ),
+          validator: validator,
+          onChanged: onChanged,
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildDropdownButtonFormField<T>({
+    required String label,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required void Function(T?) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label),
+        DropdownButtonFormField<T>(
+          decoration: getFormDecoration(
+            value: value?.toString(),
+          ),
+          isExpanded: true,
+          initialValue: value,
+          items: items,
+          onChanged: onChanged,
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
   Widget _buildIncomeField(String label, String? initialValue, void Function(String) onChanged) {
-    return TextFormField(
-      initialValue: initialValue,
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixText: 'Rp. ',
-      ),
-      onChanged: (val) {
-        onChanged(val);
-        setState(() {}); // refresh sum calculation display
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label),
+        TextFormField(
+          initialValue: formatThousands(initialValue),
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            ThousandsSeparatorInputFormatter(),
+          ],
+          decoration: getFormDecoration(
+            value: initialValue,
+            prefixText: 'Rp. ',
+          ),
+          onChanged: (val) {
+            onChanged(val);
+            setState(() {}); // refresh sum calculation display
+          },
+        ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 
   String _calculateTotalIncome() {
-    final double g = double.tryParse(_tempMember.gaji ?? '0') ?? 0;
-    final double t = double.tryParse(_tempMember.tunjangan ?? '0') ?? 0;
-    final double u = double.tryParse(_tempMember.uangMakan ?? '0') ?? 0;
-    final double h = double.tryParse(_tempMember.honor ?? '0') ?? 0;
-    final double l = double.tryParse(_tempMember.lembur ?? '0') ?? 0;
-    final double o = double.tryParse(_tempMember.pendapatanLain ?? '0') ?? 0;
-    return (g + t + u + h + l + o).toStringAsFixed(0);
+    final double g = double.tryParse((_tempMember.gaji ?? '0').replaceAll(',', '')) ?? 0;
+    final double t = double.tryParse((_tempMember.tunjangan ?? '0').replaceAll(',', '')) ?? 0;
+    final double u = double.tryParse((_tempMember.uangMakan ?? '0').replaceAll(',', '')) ?? 0;
+    final double h = double.tryParse((_tempMember.honor ?? '0').replaceAll(',', '')) ?? 0;
+    final double l = double.tryParse((_tempMember.lembur ?? '0').replaceAll(',', '')) ?? 0;
+    final double o = double.tryParse((_tempMember.pendapatanLain ?? '0').replaceAll(',', '')) ?? 0;
+    return formatThousands((g + t + u + h + l + o).toStringAsFixed(0));
   }
 
-  Widget _buildDisabilitySwitch(String label, String? currentValue, void Function(String) onChanged) {
-    final bool isOn = currentValue == '1';
-    final theme = Theme.of(context);
-
-    return SwitchListTile(
-      title: Text(label, style: const TextStyle(fontSize: 14)),
-      value: isOn,
-      activeColor: theme.primaryColor,
-      onChanged: (bool value) {
-        onChanged(value ? '1' : '2');
-      },
+  Widget _buildDisabilityRadio(String label, String? currentValue, void Function(String) onChanged) {
+    final effectiveValue = currentValue == '1' ? '1' : '2'; // Default empty values to '2' (Tidak)
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Option 'Ya' (bullet on top, text below)
+          GestureDetector(
+            onTap: () => onChanged('1'),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: Radio<String>(
+                    value: '1',
+                    groupValue: effectiveValue,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (val) {
+                      if (val != null) onChanged(val);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Ya',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          // Option 'Tidak' (bullet on top, text below)
+          GestureDetector(
+            onTap: () => onChanged('2'),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: Radio<String>(
+                    value: '2',
+                    groupValue: effectiveValue,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (val) {
+                      if (val != null) onChanged(val);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Tidak',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8), // small margin at the right end
+        ],
+      ),
     );
   }
 }

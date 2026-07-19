@@ -86,7 +86,7 @@ class Blok4AnggotaWidget extends StatelessWidget {
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: CircleAvatar(
-                    backgroundColor: theme.primaryColor.withOpacity(0.1),
+                    backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
                     foregroundColor: theme.primaryColor,
                     child: Text('${member.noUrut}'),
                   ),
@@ -104,21 +104,90 @@ class Blok4AnggotaWidget extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.edit_outlined, color: Colors.teal),
                         tooltip: 'Edit details',
-                        onPressed: () => _openMemberDetails(context, member.id),
+                        onPressed: () => _confirmAndEdit(context, member.id, name),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                         tooltip: 'Remove',
-                        onPressed: () => provider.removeFamilyMember(member.id),
+                        onPressed: () => _confirmAndDelete(context, provider, member.id, name),
                       ),
                     ],
                   ),
-                  onTap: () => _openMemberDetails(context, member.id),
+                  onTap: () => _confirmAndEdit(context, member.id, name),
                 ),
               );
             },
           ),
       ],
+    );
+  }
+
+  void _confirmAndEdit(BuildContext context, String memberId, String name) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Edit Anggota Keluarga'),
+          content: Text('Apakah Anda yakin ingin mengubah rincian data untuk $name?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('BATAL', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _openMemberDetails(context, memberId);
+              },
+              child: const Text('EDIT'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmAndDelete(BuildContext context, SurveyProvider provider, String memberId, String name) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Hapus Anggota Keluarga'),
+          content: Text('Apakah Anda yakin ingin menghapus $name dari daftar anggota keluarga?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('BATAL', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                provider.removeFamilyMember(memberId);
+                showDialog(
+                  context: context,
+                  builder: (BuildContext successContext) {
+                    return AlertDialog(
+                      title: const Text('Sukses'),
+                      content: Text('Data $name berhasil dihapus.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(successContext),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('HAPUS'),
+            ),
+          ],
+        );
+      },
     );
   }
 

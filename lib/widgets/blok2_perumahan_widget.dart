@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/survey_provider.dart';
+import 'form_helpers.dart';
 
 class Blok2PerumahanWidget extends StatelessWidget {
   const Blok2PerumahanWidget({super.key});
@@ -26,38 +29,30 @@ class Blok2PerumahanWidget extends StatelessWidget {
         const Divider(height: 32),
 
         // 5.a Jumlah keluarga tinggal dalam 1 rumah
-        TextFormField(
-          initialValue: survey.jmlKeluargaTinggal?.toString() ?? '',
+        _buildTextFormField(
+          label: '5. a. Berapa jumlah keluarga yang tinggal dalam 1 rumah/tempat tinggal? *',
+          value: survey.jmlKeluargaTinggal?.toString() ?? '',
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: '5. a. Berapa jumlah keluarga yang tinggal dalam 1 rumah/tempat tinggal?',
-            helperText: 'Jika isian = 1, rincian 5.b dilewati',
-          ),
+          helperText: 'Jika isian = 1, rincian 5.b dilewati',
           onChanged: (val) {
             final parsed = int.tryParse(val) ?? 1;
             provider.updateActiveSurvey((s) => s.jmlKeluargaTinggal = parsed);
           },
         ),
-        const SizedBox(height: 16),
 
         // 5.b Nomor KK lain (Conditional: Only show if 5.a > 1)
-        if ((survey.jmlKeluargaTinggal ?? 1) > 1) ...[
-          TextFormField(
-            initialValue: survey.noKkLain,
+        if ((survey.jmlKeluargaTinggal ?? 1) > 1)
+          _buildTextFormField(
+            label: '5. b. Sebutkan Nomor KK dari keluarga yang tinggal bersama!',
+            value: survey.noKkLain,
             keyboardType: TextInputType.number,
             maxLength: 16,
-            decoration: const InputDecoration(
-              labelText: '5. b. Sebutkan Nomor KK dari keluarga yang tinggal bersama!',
-              counterText: '',
-            ),
             onChanged: (val) => provider.updateActiveSurvey((s) => s.noKkLain = val),
           ),
-          const SizedBox(height: 16),
-        ],
 
         // 6.a Jenis Bangunan
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '6. a. Apa jenis bangunan tempat tinggal yang ditempati?'),
+        _buildDropdownButtonFormField<String>(
+          label: '6. a. Apa jenis bangunan tempat tinggal yang ditempati? *',
           value: survey.jenisBangunan,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Rumah tinggal tunggal')),
@@ -68,23 +63,18 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.jenisBangunan = val),
         ),
-        const SizedBox(height: 16),
 
         // 6.b Nama/Nomor Lantai (Conditional: Only show if 6.a is Apartemen or Rusun (2, 3))
-        if (survey.jenisBangunan == '2' || survey.jenisBangunan == '3') ...[
-          TextFormField(
-            initialValue: survey.namaNoLantai,
-            decoration: const InputDecoration(
-              labelText: '6. b. Jika apartemen/rumah susun, tuliskan Nama/Nomor lantai',
-            ),
+        if (survey.jenisBangunan == '2' || survey.jenisBangunan == '3')
+          _buildTextFormField(
+            label: '6. b. Jika apartemen/rumah susun, tuliskan Nama/Nomor lantai',
+            value: survey.namaNoLantai,
             onChanged: (val) => provider.updateActiveSurvey((s) => s.namaNoLantai = val),
           ),
-          const SizedBox(height: 16),
-        ],
 
         // 7.a Status kepemilikan bangunan
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '7. a. Apa status kepemilikan bangunan tempat tinggal?'),
+        _buildDropdownButtonFormField<String>(
+          label: '7. a. Apa status kepemilikan bangunan tempat tinggal? *',
           value: survey.statusKepemilikan,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Milik sendiri')),
@@ -95,12 +85,11 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.statusKepemilikan = val),
         ),
-        const SizedBox(height: 16),
 
         // 7.b Bukti kepemilikan (Conditional: Only show if 7.a is Milik Sendiri (1))
-        if (survey.statusKepemilikan == '1') ...[
-          DropdownButtonFormField<String>(
-            decoration: const InputDecoration(labelText: '7. b. Apa jenis bukti kepemilikan tanah & bangunan?'),
+        if (survey.statusKepemilikan == '1')
+          _buildDropdownButtonFormField<String>(
+            label: '7. b. Apa jenis bukti kepemilikan tanah & bangunan?',
             value: survey.buktiKepemilikan,
             items: const [
               DropdownMenuItem(value: '1', child: Text('1. SHM')),
@@ -110,38 +99,30 @@ class Blok2PerumahanWidget extends StatelessWidget {
             ],
             onChanged: (val) => provider.updateActiveSurvey((s) => s.buktiKepemilikan = val),
           ),
-          const SizedBox(height: 16),
-        ],
 
         // 8 Perkiraan Sewa Sebulan (Label changes depending on 7.a status)
-        if (survey.statusKepemilikan != null) ...[
-          TextFormField(
-            initialValue: survey.sewaPerkiraan,
+        if (survey.statusKepemilikan != null)
+          _buildTextFormField(
+            label: _getSewaLabel(survey.statusKepemilikan!),
+            value: survey.sewaPerkiraan,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: _getSewaLabel(survey.statusKepemilikan!),
-              prefixText: 'Rp. ',
-            ),
+            prefixText: 'Rp. ',
             onChanged: (val) => provider.updateActiveSurvey((s) => s.sewaPerkiraan = val),
           ),
-          const SizedBox(height: 16),
-        ],
 
         // 9 Luas lantai
-        TextFormField(
-          initialValue: survey.luasLantai?.toString() ?? '',
+        _buildTextFormField(
+          label: '9. Berapa luas lantai bangunan tempat tinggal?',
+          value: formatDouble(survey.luasLantai),
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: '9. Berapa luas lantai bangunan tempat tinggal?',
-            suffixText: 'm²',
-          ),
-          onChanged: (val) => provider.updateActiveSurvey((s) => s.luasLantai = int.tryParse(val) ?? 0),
+          suffixText: 'm²',
+          isDoubleInput: true,
+          onChanged: (val) => provider.updateActiveSurvey((s) => s.luasLantai = parseIndonesianDouble(val)),
         ),
-        const SizedBox(height: 16),
 
         // 10.a Bahan Lantai Terluas
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '10. a. Apa bahan bangunan utama lantai rumah terluas?'),
+        _buildDropdownButtonFormField<String>(
+          label: '10. a. Apa bahan bangunan utama lantai rumah terluas?',
           value: survey.bahanLantai,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Marmer/granit')),
@@ -156,11 +137,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.bahanLantai = val),
         ),
-        const SizedBox(height: 16),
 
         // 10.b Kondisi Lantai
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '10. b. Kondisi Lantai'),
+        _buildDropdownButtonFormField<String>(
+          label: '10. b. Kondisi Lantai',
           value: survey.kondisiLantai,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Baik')),
@@ -170,11 +150,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.kondisiLantai = val),
         ),
-        const SizedBox(height: 16),
 
         // 11.a Bahan Dinding Terluas
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '11. a. Apa bahan bangunan utama dinding rumah terluas?'),
+        _buildDropdownButtonFormField<String>(
+          label: '11. a. Apa bahan bangunan utama dinding rumah terluas?',
           value: survey.bahanDinding,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Tembok')),
@@ -187,11 +166,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.bahanDinding = val),
         ),
-        const SizedBox(height: 16),
 
         // 11.b Kondisi Dinding
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '11. b. Kondisi Dinding'),
+        _buildDropdownButtonFormField<String>(
+          label: '11. b. Kondisi Dinding',
           value: survey.kondisiDinding,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Baik')),
@@ -201,11 +179,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.kondisiDinding = val),
         ),
-        const SizedBox(height: 16),
 
         // 12.a Bahan Atap Terluas
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '12. a. Apa bahan bangunan utama atap rumah terluas?'),
+        _buildDropdownButtonFormField<String>(
+          label: '12. a. Apa bahan bangunan utama atap rumah terluas?',
           value: survey.bahanAtap,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Beton')),
@@ -219,11 +196,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.bahanAtap = val),
         ),
-        const SizedBox(height: 16),
 
         // 12.b Kondisi Atap
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '12. b. Kondisi Atap'),
+        _buildDropdownButtonFormField<String>(
+          label: '12. b. Kondisi Atap',
           value: survey.kondisiAtap,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Baik')),
@@ -233,13 +209,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.kondisiAtap = val),
         ),
-        const SizedBox(height: 16),
 
         // 13 Fasilitas Sanitasi (BAB)
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(
-            labelText: '13. Fasilitas tempat buang air besar & siapa yang menggunakan?',
-          ),
+        _buildDropdownButtonFormField<String>(
+          label: '13. Fasilitas tempat buang air besar & siapa yang menggunakan?',
           value: survey.fasilitasBab,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Ada, digunakan anggota keluarga sendiri')),
@@ -251,12 +224,11 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.fasilitasBab = val),
         ),
-        const SizedBox(height: 16),
 
         // 14 Jenis Kloset (Conditional: Only show if 13 is 1, 2, 3)
-        if (survey.fasilitasBab == '1' || survey.fasilitasBab == '2' || survey.fasilitasBab == '3') ...[
-          DropdownButtonFormField<String>(
-            decoration: const InputDecoration(labelText: '14. Apa jenis kloset yang digunakan?'),
+        if (survey.fasilitasBab == '1' || survey.fasilitasBab == '2' || survey.fasilitasBab == '3')
+          _buildDropdownButtonFormField<String>(
+            label: '14. Apa jenis kloset yang digunakan?',
             value: survey.jenisKloset,
             items: const [
               DropdownMenuItem(value: '1', child: Text('1. Leher angsa')),
@@ -266,12 +238,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
             ],
             onChanged: (val) => provider.updateActiveSurvey((s) => s.jenisKloset = val),
           ),
-          const SizedBox(height: 16),
-        ],
 
         // 15 Tempat pembuangan tinja
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '15. Di manakah tempat pembuangan akhir tinja?'),
+        _buildDropdownButtonFormField<String>(
+          label: '15. Di manakah tempat pembuangan akhir tinja?',
           value: survey.pembuanganTinja,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Tangki septik')),
@@ -283,11 +253,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.pembuanganTinja = val),
         ),
-        const SizedBox(height: 16),
 
         // 16 Sumber Air Minum
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '16. Apa sumber air utama untuk minum?'),
+        _buildDropdownButtonFormField<String>(
+          label: '16. Apa sumber air utama untuk minum? *',
           value: survey.sumberAirMinum,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Air kemasan bermerek')),
@@ -304,11 +273,10 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.sumberAirMinum = val),
         ),
-        const SizedBox(height: 16),
 
         // 17 Sumber Penerangan Utama
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: '17. Apa sumber penerangan utama rumah ini?'),
+        _buildDropdownButtonFormField<String>(
+          label: '17. Apa sumber penerangan utama rumah ini? *',
           value: survey.sumberPenerangan,
           items: const [
             DropdownMenuItem(value: '1', child: Text('1. Listrik PLN dengan meteran')),
@@ -318,12 +286,11 @@ class Blok2PerumahanWidget extends StatelessWidget {
           ],
           onChanged: (val) => provider.updateActiveSurvey((s) => s.sumberPenerangan = val),
         ),
-        const SizedBox(height: 16),
 
         // 18.a Jumlah meteran (Conditional: Only show if 17 is Listrik PLN dengan meteran (1))
         if (survey.sumberPenerangan == '1') ...[
-          DropdownButtonFormField<int>(
-            decoration: const InputDecoration(labelText: '18. a. Berapa jumlah meteran listrik terpasang?'),
+          _buildDropdownButtonFormField<int>(
+            label: '18. a. Berapa jumlah meteran listrik terpasang?',
             value: survey.meteranPlnCount,
             items: const [
               DropdownMenuItem(value: 1, child: Text('1 Meteran')),
@@ -331,7 +298,6 @@ class Blok2PerumahanWidget extends StatelessWidget {
             ],
             onChanged: (val) => provider.updateActiveSurvey((s) => s.meteranPlnCount = val ?? 1),
           ),
-          const SizedBox(height: 16),
 
           // Meteran Grid
           _buildMeteranInputs(context, survey, provider),
@@ -339,37 +305,27 @@ class Blok2PerumahanWidget extends StatelessWidget {
         ],
 
         // 19 Pengeluaran listrik sebulan
-        TextFormField(
-          initialValue: survey.pengeluaranListrik,
+        _buildTextFormField(
+          label: '19. Berapa nilai pengeluaran listrik sebulan?',
+          value: survey.pengeluaranListrik,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: '19. Berapa nilai pengeluaran listrik sebulan?',
-            prefixText: 'Rp. ',
-          ),
+          prefixText: 'Rp. ',
           onChanged: (val) => provider.updateActiveSurvey((s) => s.pengeluaranListrik = val),
         ),
-        const SizedBox(height: 16),
 
         // 20 Pengeluaran pulsa sebulan
-        TextFormField(
-          initialValue: survey.pengeluaranInternet,
+        _buildTextFormField(
+          label: '20. Berapa pengeluaran pulsa & internet seluruh anggota sebulan?',
+          value: survey.pengeluaranInternet,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: '20. Berapa pengeluaran pulsa & internet seluruh anggota sebulan?',
-            prefixText: 'Rp. ',
-          ),
+          prefixText: 'Rp. ',
           onChanged: (val) => provider.updateActiveSurvey((s) => s.pengeluaranInternet = val),
         ),
-        const SizedBox(height: 24),
 
         // 21 Foto Rumah
-        Text(
-          '21. Foto Rumah (Pencerminan Kualitas Bangunan)',
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        const FormLabel('21. Foto Rumah (Pencerminan Kualitas Bangunan)'),
+        const SizedBox(height: 4),
+        Column(
           children: [
             _buildPhotoPicker(
               context,
@@ -391,7 +347,7 @@ class Blok2PerumahanWidget extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -426,13 +382,14 @@ class Blok2PerumahanWidget extends StatelessWidget {
         children: [
           const Text('Rincian Daya & ID Pelanggan PLN', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          
+
           // Meteran 1
           Text('Meteran Listrik 1', style: TextStyle(color: theme.primaryColor, fontSize: 13)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            decoration: const InputDecoration(labelText: 'Daya Listrik (Meteran 1)'),
-            value: survey.dayaMeteran1,
+            decoration: getFormDecoration(value: survey.dayaMeteran1),
+            isExpanded: true,
+            initialValue: survey.dayaMeteran1,
             items: const [
               DropdownMenuItem(value: '1', child: Text('1. 450 watt')),
               DropdownMenuItem(value: '2', child: Text('2. 900 watt')),
@@ -447,18 +404,19 @@ class Blok2PerumahanWidget extends StatelessWidget {
             initialValue: survey.idPelanggan1,
             keyboardType: TextInputType.number,
             maxLength: 12,
-            decoration: const InputDecoration(labelText: 'ID Pelanggan (11-12 digit)', counterText: ''),
+            decoration: getFormDecoration(value: survey.idPelanggan1, hintText: 'ID Pelanggan (11-12 digit)'),
             onChanged: (val) => provider.updateActiveSurvey((s) => s.idPelanggan1 = val),
           ),
-          
+
           // Meteran 2
           if (count > 1) ...[
             const Divider(height: 24),
             Text('Meteran Listrik 2', style: TextStyle(color: theme.primaryColor, fontSize: 13)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'Daya Listrik (Meteran 2)'),
-              value: survey.dayaMeteran2,
+              decoration: getFormDecoration(value: survey.dayaMeteran2),
+              isExpanded: true,
+              initialValue: survey.dayaMeteran2,
               items: const [
                 DropdownMenuItem(value: '1', child: Text('1. 450 watt')),
                 DropdownMenuItem(value: '2', child: Text('2. 900 watt')),
@@ -473,7 +431,7 @@ class Blok2PerumahanWidget extends StatelessWidget {
               initialValue: survey.idPelanggan2,
               keyboardType: TextInputType.number,
               maxLength: 12,
-              decoration: const InputDecoration(labelText: 'ID Pelanggan (11-12 digit)', counterText: ''),
+              decoration: getFormDecoration(value: survey.idPelanggan2, hintText: 'ID Pelanggan (11-12 digit)'),
               onChanged: (val) => provider.updateActiveSurvey((s) => s.idPelanggan2 = val),
             ),
           ]
@@ -487,32 +445,160 @@ class Blok2PerumahanWidget extends StatelessWidget {
     final hasPhoto = currentUrl != null && currentUrl.isNotEmpty;
 
     return GestureDetector(
-      onTap: () {
-        // Simulate Camera input by assigning a mock local path/URL
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        onPicked('https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=200&t=$timestamp');
+      onTap: () async {
+        final ImagePicker picker = ImagePicker();
+        try {
+          final XFile? image = await picker.pickImage(
+            source: ImageSource.camera,
+            maxWidth: 1200,
+            imageQuality: 80,
+          );
+          if (image != null) {
+            onPicked(image.path);
+          }
+        } catch (e) {
+          debugPrint('Error picking image: $e');
+          // fallback simulator in case of error (e.g. no camera on emulator)
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          onPicked('https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=600&t=$timestamp');
+        }
       },
-      child: Column(
-        children: [
-          Container(
-            height: 80,
-            width: 80,
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: hasPhoto ? theme.primaryColor : theme.dividerColor),
-              image: hasPhoto
-                  ? DecorationImage(image: NetworkImage(currentUrl), fit: BoxFit.cover)
-                  : null,
-            ),
-            child: !hasPhoto
-                ? const Icon(Icons.camera_alt_outlined, size: 28, color: Colors.grey)
-                : null,
+      child: Container(
+        height: 150,
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasPhoto ? Colors.green.shade300 : theme.dividerColor,
+            width: hasPhoto ? 2 : 1,
           ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 11)),
-        ],
+          image: hasPhoto
+              ? DecorationImage(
+                  image: currentUrl.startsWith('http')
+                      ? NetworkImage(currentUrl) as ImageProvider
+                      : FileImage(File(currentUrl)) as ImageProvider,
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: hasPhoto
+            ? Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const Row(
+                        children: [
+                          Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'Ubah Foto',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.camera_alt_outlined, size: 36, color: theme.primaryColor),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ambil Foto $label',
+                    style: TextStyle(
+                      color: theme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Ketuk untuk membuka kamera',
+                    style: TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                ],
+              ),
       ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required String label,
+    required String? value,
+    required void Function(String) onChanged,
+    TextInputType keyboardType = TextInputType.text,
+    String? helperText,
+    String? prefixText,
+    String? suffixText,
+    int? maxLength,
+    int maxLines = 1,
+    bool isDoubleInput = false,
+  }) {
+    final isFormatted = prefixText == 'Rp. ' || isDoubleInput;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label, helperText: helperText),
+        TextFormField(
+          initialValue: isFormatted ? formatThousands(value) : value,
+          keyboardType: keyboardType,
+          inputFormatters: isFormatted
+              ? [ThousandsSeparatorInputFormatter()]
+              : null,
+          maxLength: maxLength,
+          maxLines: maxLines,
+          decoration: getFormDecoration(
+            value: value,
+            prefixText: prefixText,
+            suffixText: suffixText,
+          ),
+          onChanged: onChanged,
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildDropdownButtonFormField<T>({
+    required String label,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required void Function(T?) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label),
+        DropdownButtonFormField<T>(
+          decoration: getFormDecoration(
+            value: value?.toString(),
+          ),
+          isExpanded: true,
+          initialValue: value,
+          items: items,
+          onChanged: onChanged,
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

@@ -49,4 +49,6 @@ backend/node_modules/
 backend/dist/
 backend/.env
 backend/src.zip
+backend/backend_log.txt
+.env_supabase
 

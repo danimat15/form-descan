@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -8,16 +9,27 @@ class AuthService {
   static const String _userKey = 'auth_user';
   static const String _apiUrlKey = 'api_url';
 
-  // Default API base URL (cPanel production path)
-  static const String defaultApiBaseUrl = 'https://nlab-sangihe.web.bps.go.id/backend-form';
+  // URL untuk Android Emulator (10.0.2.2 adalah localhost komputer host dari emulator)
+  static const String androidEmulatorUrl = 'http://10.0.2.2:3000';
+  // URL untuk HP/Tablet fisik Android (sesuaikan dengan IP lokal laptop Anda jika tidak menggunakan adb reverse)
+  static const String androidPhysicalUrl = 'http://192.168.1.84:3000';
+  // URL untuk iOS simulator, desktop, dan koneksi adb reverse
+  static const String _localUrl = 'http://localhost:3000';
+
+  static String get defaultApiBaseUrl {
+    if (!kIsWeb && Platform.isAndroid) {
+      // Menggunakan 10.0.2.2 agar otomatis terhubung ke localhost komputer host dari emulator.
+      // Jika Anda memakai kabel USB (adb reverse), Anda bisa mengubahnya lewat pengaturan (ikon gerigi) di pojok kanan atas login screen.
+      return androidEmulatorUrl;
+    }
+    return _localUrl;
+  }
 
   static Future<String> getApiBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    String url = prefs.getString(_apiUrlKey) ?? defaultApiBaseUrl;
-    if (url.startsWith('http://nlab-sangihe.web.bps.go.id')) {
-      url = url.replaceFirst('http://', 'https://');
-    }
-    return url;
+    final saved = prefs.getString(_apiUrlKey);
+    if (saved != null && saved.isNotEmpty) return saved;
+    return defaultApiBaseUrl;
   }
 
   static Future<void> setApiBaseUrl(String url) async {

@@ -16,22 +16,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   
-  // Profile registration controllers
-  final _desaController = TextEditingController();
-  final _kecamatanController = TextEditingController();
-  final _kabupatenController = TextEditingController();
-
   bool _isLoading = false;
-  bool _isSignUp = false;
   String? _errorMessage;
+  bool _obscurePassword = true;
+
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _desaController.dispose();
-    _kecamatanController.dispose();
-    _kabupatenController.dispose();
     super.dispose();
   }
 
@@ -46,48 +39,21 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final provider = Provider.of<SurveyProvider>(context, listen: false);
 
-      if (_isSignUp) {
-        final result = await AuthService.register(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          desa: _desaController.text.trim(),
-          kecamatan: _kecamatanController.text.trim(),
-          kabupaten: _kabupatenController.text.trim(),
-        );
+      final result = await AuthService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-        if (result['success'] == true) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Registration successful! You can now log in.')),
-            );
-            setState(() {
-              _isSignUp = false;
-              _isLoading = false;
-            });
-          }
-        } else {
-          setState(() {
-            _errorMessage = result['error'];
-            _isLoading = false;
-          });
+      if (result['success'] == true) {
+        await provider.initializeProvider();
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
         }
       } else {
-        final result = await AuthService.login(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-
-        if (result['success'] == true) {
-          await provider.initializeProvider();
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/dashboard');
-          }
-        } else {
-          setState(() {
-            _errorMessage = result['error'];
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _errorMessage = result['error'];
+          _isLoading = false;
+        });
       }
     } catch (e) {
       setState(() {
@@ -97,6 +63,98 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _showApiUrlDialog(BuildContext context) async {
+    final provider = Provider.of<SurveyProvider>(context, listen: false);
+    final currentUrl = await AuthService.getApiBaseUrl();
+    final controller = TextEditingController(text: currentUrl);
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.settings_outlined, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 8),
+              const Text('Pengaturan API URL'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Masukkan alamat IP backend laptop Anda agar dapat terhubung tanpa kabel (satu Wi-Fi) atau ubah alamat backend.',
+                style: TextStyle(fontSize: 13, color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.black87),
+                decoration: InputDecoration(
+                  labelText: 'API Base URL',
+                  hintText: 'http://192.168.1.42:3000',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pintasan Cepat (Ketuk untuk menyalin):',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.black38),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('Localhost (USB)'),
+                    onPressed: () => controller.text = 'http://localhost:3000',
+                  ),
+                  ActionChip(
+                    label: const Text('Emulator (10.0.2.2)'),
+                    onPressed: () => controller.text = 'http://10.0.2.2:3000',
+                  ),
+                  ActionChip(
+                    label: const Text('Wi-Fi Laptop (192.168.1.42)'),
+                    onPressed: () => controller.text = 'http://192.168.1.42:3000',
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newUrl = controller.text.trim();
+                if (newUrl.isNotEmpty) {
+                  await AuthService.setApiBaseUrl(newUrl);
+                  provider.apiBaseUrl = newUrl;
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('API URL berhasil disimpan: $newUrl')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -104,9 +162,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F3F5),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                children: [
               const SizedBox(height: 40),
               // Hero/Logo Section
               Center(
@@ -222,12 +282,24 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Password Field
                             TextFormField(
                               controller: _passwordController,
-                              obscureText: true,
+                              obscureText: _obscurePassword,
                               style: TextStyle(color: theme.colorScheme.onSurface),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Password',
                                 hintText: '••••••••',
-                                prefixIcon: Icon(Icons.lock_outline),
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -240,39 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
 
-                            // Fields for registration
-                            if (_isSignUp) ...[
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _desaController,
-                                style: TextStyle(color: theme.colorScheme.onSurface),
-                                decoration: const InputDecoration(
-                                  labelText: 'Nama Desa / Kelurahan',
-                                  prefixIcon: Icon(Icons.location_city_outlined),
-                                ),
-                                validator: (value) => value == null || value.trim().isEmpty ? 'Desa is required' : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _kecamatanController,
-                                style: TextStyle(color: theme.colorScheme.onSurface),
-                                decoration: const InputDecoration(
-                                  labelText: 'Kecamatan',
-                                  prefixIcon: Icon(Icons.map_outlined),
-                                ),
-                                validator: (value) => value == null || value.trim().isEmpty ? 'Kecamatan is required' : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _kabupatenController,
-                                style: TextStyle(color: theme.colorScheme.onSurface),
-                                decoration: const InputDecoration(
-                                  labelText: 'Kabupaten',
-                                  prefixIcon: Icon(Icons.explore_outlined),
-                                ),
-                                validator: (value) => value == null || value.trim().isEmpty ? 'Kabupaten is required' : null,
-                              ),
-                            ],
+
                             const SizedBox(height: 20),
 
                             // Keep logged in & Forgot password
@@ -337,24 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       width: 20,
                                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                     )
-                                  : Text(_isSignUp ? 'REGISTER' : 'Masuk dengan Email'),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Switch Login / Sign Up
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isSignUp = !_isSignUp;
-                                  _errorMessage = null;
-                                });
-                              },
-                              child: Text(
-                                _isSignUp
-                                    ? 'Already have an account? Log In'
-                                    : 'Don\'t have an account? Sign Up',
-                                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-                              ),
+                                  : const Text('Masuk dengan Email'),
                             ),
 
                             // Divider
@@ -453,7 +476,24 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-      ),
-    );
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white70,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
+              onPressed: () => _showApiUrlDialog(context),
+              tooltip: 'Pengaturan API URL',
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+);
   }
 }

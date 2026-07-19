@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/survey_provider.dart';
+import 'form_helpers.dart';
 
 class Blok3AsetWidget extends StatelessWidget {
   const Blok3AsetWidget({super.key});
@@ -77,15 +78,14 @@ class Blok3AsetWidget extends StatelessWidget {
 
         // e. Emas/Perhiasan & f. Komputer/laptop
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: TextFormField(
-                initialValue: survey.emas?.toString() ?? '',
+              child: _buildTextFormField(
+                label: 'Emas / Perhiasan (gram)',
+                value: survey.emas != null && survey.emas != 0.0 ? survey.emas.toString() : '',
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Emas / Perhiasan (gram)',
-                  suffixText: 'gram',
-                ),
+                suffixText: 'gram',
                 onChanged: (val) => provider.updateActiveSurvey((s) => s.emas = double.tryParse(val) ?? 0.0),
               ),
             ),
@@ -108,6 +108,7 @@ class Blok3AsetWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: 120,
@@ -119,13 +120,11 @@ class Blok3AsetWidget extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: TextFormField(
-                initialValue: survey.motorNilai,
+              child: _buildTextFormField(
+                label: 'Total Nilai Aset Motor',
+                value: survey.motorNilai,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Total Nilai Aset Motor',
-                  prefixText: 'Rp. ',
-                ),
+                prefixText: 'Rp. ',
                 onChanged: (val) => provider.updateActiveSurvey((s) => s.motorNilai = val),
               ),
             ),
@@ -140,6 +139,7 @@ class Blok3AsetWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: 120,
@@ -151,13 +151,11 @@ class Blok3AsetWidget extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: TextFormField(
-                initialValue: survey.mobilNilai,
+              child: _buildTextFormField(
+                label: 'Total Nilai Aset Mobil',
+                value: survey.mobilNilai,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Total Nilai Aset Mobil',
-                  prefixText: 'Rp. ',
-                ),
+                prefixText: 'Rp. ',
                 onChanged: (val) => provider.updateActiveSurvey((s) => s.mobilNilai = val),
               ),
             ),
@@ -178,6 +176,7 @@ class Blok3AsetWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: 120,
@@ -189,13 +188,11 @@ class Blok3AsetWidget extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: TextFormField(
-                initialValue: survey.tanahLainNilai,
+              child: _buildTextFormField(
+                label: 'Total Nilai Jual Tanah',
+                value: survey.tanahLainNilai,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Total Nilai Jual Tanah',
-                  prefixText: 'Rp. ',
-                ),
+                prefixText: 'Rp. ',
                 onChanged: (val) => provider.updateActiveSurvey((s) => s.tanahLainNilai = val),
               ),
             ),
@@ -210,6 +207,7 @@ class Blok3AsetWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: 120,
@@ -221,13 +219,11 @@ class Blok3AsetWidget extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: TextFormField(
-                initialValue: survey.rumahLainNilai,
+              child: _buildTextFormField(
+                label: 'Total Nilai Jual Bangunan',
+                value: survey.rumahLainNilai,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Total Nilai Jual Bangunan',
-                  prefixText: 'Rp. ',
-                ),
+                prefixText: 'Rp. ',
                 onChanged: (val) => provider.updateActiveSurvey((s) => s.rumahLainNilai = val),
               ),
             ),
@@ -238,21 +234,57 @@ class Blok3AsetWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildTextFormField({
+    required String label,
+    required String? value,
+    required void Function(String) onChanged,
+    TextInputType keyboardType = TextInputType.text,
+    String? prefixText,
+    String? suffixText,
+  }) {
+    final isCurrency = prefixText == 'Rp. ';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label),
+        TextFormField(
+          initialValue: isCurrency ? formatThousands(value) : value,
+          keyboardType: keyboardType,
+          inputFormatters: isCurrency
+              ? [ThousandsSeparatorInputFormatter()]
+              : null,
+          decoration: getFormDecoration(
+            value: value,
+            prefixText: prefixText,
+            suffixText: suffixText,
+          ),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
   Widget _buildCounterField({
     required String label,
     required int value,
     required void Function(int) onChanged,
   }) {
-    return TextFormField(
-      initialValue: value.toString(),
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: 'unit',
-      ),
-      onChanged: (val) {
-        onChanged(int.tryParse(val) ?? 0);
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FormLabel(label),
+        TextFormField(
+          initialValue: value.toString(),
+          keyboardType: TextInputType.number,
+          decoration: getFormDecoration(
+            value: value > 0 ? value.toString() : '',
+            suffixText: 'unit',
+          ),
+          onChanged: (val) {
+            onChanged(int.tryParse(val) ?? 0);
+          },
+        ),
+      ],
     );
   }
 }

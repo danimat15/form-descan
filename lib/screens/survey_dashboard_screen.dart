@@ -1445,7 +1445,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
 
                     if (context.mounted) {
                       Navigator.pop(context);
-                      await SharePlus.instance.share(
+                      await Share.shareXFiles(
                         [XFile(file.path)],
                         text: 'File Backup Data Kuesioner Form Descan (BPS Sangihe)',
                       );

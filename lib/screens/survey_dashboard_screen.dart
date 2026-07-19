@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../services/auth_service.dart';
 import '../providers/survey_provider.dart';
 import 'survey_stepper_screen.dart';
@@ -1382,7 +1386,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Ekspor data lokal (Draf & Riwayat Kuesioner) ke dalam format file/teks cadangan (ZIP/JSON) untuk pengamanan data.',
+                'Simpan data kuesioner lokal Anda ke dalam file cadangan (.json) agar mudah dibagikan via WhatsApp atau disimpan ke HP.',
                 style: TextStyle(fontSize: 13, color: Colors.black87),
               ),
               const SizedBox(height: 16),
@@ -1422,22 +1426,57 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Kode Backup (ZIP/JSON):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              const SizedBox(height: 6),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 120),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.share, size: 20),
+                label: const Text('BAGIKAN / SIMPAN FILE BACKUP (.json)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    backupData,
-                    style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey.shade800),
-                  ),
+                onPressed: () async {
+                  try {
+                    final tempDir = await getTemporaryDirectory();
+                    final nowStr = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+                    final filePath = '${tempDir.path}/backup_descan_$nowStr.json';
+                    final file = File(filePath);
+                    await file.writeAsString(backupData);
+
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      await SharePlus.instance.share(
+                        [XFile(file.path)],
+                        text: 'File Backup Data Kuesioner Form Descan (BPS Sangihe)',
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gagal membuat file backup: $e'), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text('Salin Teks Kode Backup'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(42),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: backupData));
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✓ Teks backup berhasil disalin ke clipboard!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1445,25 +1484,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('TUTUP'),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.copy, size: 18),
-            label: const Text('SALIN TEKS BACKUP'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: backupData));
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✓ Data backup berhasil disalin ke clipboard! Siap disimpan / dikirim via WhatsApp.'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
+            child: const Text('TUTUP', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
@@ -1490,41 +1511,183 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Unggah atau tempel teks/kode backup (ZIP/JSON) untuk memulihkan data kuesioner Anda saat pindah perangkat atau setelah pembaruan aplikasi.',
+                'Pilih file backup (.json) dari HP Anda untuk memulihkan draf kuesioner saat pindah perangkat atau update aplikasi.',
                 style: TextStyle(fontSize: 13, color: Colors.black87),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.upload_file, size: 20),
+                label: const Text('PILIH FILE BACKUP (.json / .zip)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orangeAccent,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () async {
+                  try {
+                    final result = await FilePicker.platform.pickFiles(
+                      type: FileType.any,
+                    );
+
+                    if (result != null && result.files.isNotEmpty) {
+                      String fileContent = '';
+                      final file = result.files.first;
+
+                      if (file.path != null) {
+                        fileContent = await File(file.path!).readAsString();
+                      } else if (file.bytes != null) {
+                        fileContent = String.fromCharCodes(file.bytes!);
+                      }
+
+                      if (fileContent.isNotEmpty) {
+                        final restoreResult = await provider.importBackupData(fileContent);
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          if (restoreResult['success'] == true) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.green),
+                                    SizedBox(width: 8),
+                                    Text('Restorasi Sukses'),
+                                  ],
+                                ),
+                                content: Text(
+                                  'Berhasil memulihkan data dari file "${file.name}":\n\n'
+                                  '• ${restoreResult['restoredDrafts']} Draf Kuesioner\n'
+                                  '• ${restoreResult['restoredSynced']} Kuesioner Tersinkronisasi',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.error, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Restorasi Gagal'),
+                                  ],
+                                ),
+                                content: Text('Gagal memproses file backup: ${restoreResult['error']}'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gagal membaca file: $e'), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text('Atau Tempel Teks Backup (Opsional):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: restoreController,
+                maxLines: 4,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                decoration: InputDecoration(
+                  hintText: 'Tempel teks JSON di sini...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.all(10),
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Tempel Kode Backup:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   TextButton.icon(
                     icon: const Icon(Icons.paste, size: 16),
-                    label: const Text('Tempel dari Clipboard', style: TextStyle(fontSize: 12)),
+                    label: const Text('Tempel Clipboard', style: TextStyle(fontSize: 12)),
                     onPressed: () async {
                       final data = await Clipboard.getData(Clipboard.kTextPlain);
                       if (data?.text != null && data!.text!.isNotEmpty) {
                         restoreController.text = data.text!;
-                      } else {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Clipboard kosong.')),
+                      }
+                    },
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final text = restoreController.text.trim();
+                      if (text.isEmpty) return;
+
+                      final restoreResult = await provider.importBackupData(text);
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        if (restoreResult['success'] == true) {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.green),
+                                  SizedBox(width: 8),
+                                  Text('Restorasi Sukses'),
+                                ],
+                              ),
+                              content: Text(
+                                'Berhasil memulihkan data:\n\n'
+                                '• ${restoreResult['restoredDrafts']} Draf Kuesioner\n'
+                                '• ${restoreResult['restoredSynced']} Kuesioner Tersinkronisasi',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.error, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Restorasi Gagal'),
+                                ],
+                              ),
+                              content: Text('Gagal memulihkan data: ${restoreResult['error']}'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
                           );
                         }
                       }
                     },
+                    child: const Text('RESTORE TEKS'),
                   ),
                 ],
-              ),
-              TextField(
-                controller: restoreController,
-                maxLines: 5,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
-                decoration: InputDecoration(
-                  hintText: 'Tempelkan kode backup ZIP/JSON di sini...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.all(10),
-                ),
               ),
             ],
           ),
@@ -1533,73 +1696,6 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('BATAL', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.unarchive, size: 18),
-            label: const Text('PROSES RESTORE'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orangeAccent,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              final text = restoreController.text.trim();
-              if (text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Mohon masukkan kode backup terlebih dahulu.')),
-                );
-                return;
-              }
-
-              final result = await provider.importBackupData(text);
-              if (context.mounted) {
-                Navigator.pop(context);
-                if (result['success'] == true) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('Restorasi Sukses'),
-                        ],
-                      ),
-                      content: Text(
-                        'Berhasil memulihkan data kuesioner:\n'
-                        '• ${result['restoredDrafts']} Draf Kuesioner\n'
-                        '• ${result['restoredSynced']} Kuesioner Tersinkronisasi',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Row(
-                        children: [
-                          Icon(Icons.error, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Restorasi Gagal'),
-                        ],
-                      ),
-                      content: Text('Gagal memulihkan data: ${result['error']}'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-              }
-            },
           ),
         ],
       ),

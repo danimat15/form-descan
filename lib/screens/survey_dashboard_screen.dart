@@ -1373,11 +1373,17 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.backup_outlined, color: Colors.blueAccent),
             SizedBox(width: 8),
-            Text('Backup Data Kuesioner', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                'Backup Data Kuesioner',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -1402,7 +1408,9 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total Draf Kuesioner:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Flexible(
+                          child: Text('Total Draf Kuesioner:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
                         Chip(
                           label: Text('$draftsCount Draf', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           backgroundColor: Colors.orange,
@@ -1414,7 +1422,9 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total Tersinkron:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Flexible(
+                          child: Text('Total Tersinkron:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
                         Chip(
                           label: Text('$syncedCount Data', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           backgroundColor: Colors.green,
@@ -1428,11 +1438,16 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 icon: const Icon(Icons.share, size: 20),
-                label: const Text('BAGIKAN / SIMPAN FILE BACKUP (.json)'),
+                label: const Text(
+                  'BAGIKAN / SIMPAN FILE BACKUP (.json)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: () async {
@@ -1462,7 +1477,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 icon: const Icon(Icons.copy, size: 18),
-                label: const Text('Salin Teks Kode Backup'),
+                label: const Text('Salin Teks Kode Backup', style: TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(42),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1498,11 +1513,17 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.restore_outlined, color: Colors.orangeAccent),
             SizedBox(width: 8),
-            Text('Restore Data Kuesioner', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                'Restore Data Kuesioner',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -1511,17 +1532,22 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Pilih file backup (.json) dari HP Anda untuk memulihkan draf kuesioner saat pindah perangkat atau update aplikasi.',
+                'Pilih file backup (.json / .zip) dari HP Anda untuk memulihkan draf kuesioner saat pindah perangkat atau update aplikasi.',
                 style: TextStyle(fontSize: 13, color: Colors.black87),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 icon: const Icon(Icons.upload_file, size: 20),
-                label: const Text('PILIH FILE BACKUP (.json / .zip)'),
+                label: const Text(
+                  'PILIH FILE BACKUP (.json / .zip)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orangeAccent,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: () async {
@@ -1552,7 +1578,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                                   children: [
                                     Icon(Icons.check_circle, color: Colors.green),
                                     SizedBox(width: 8),
-                                    Text('Restorasi Sukses'),
+                                    Expanded(child: Text('Restorasi Sukses')),
                                   ],
                                 ),
                                 content: Text(
@@ -1576,7 +1602,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                                   children: [
                                     Icon(Icons.error, color: Colors.red),
                                     SizedBox(width: 8),
-                                    Text('Restorasi Gagal'),
+                                    Expanded(child: Text('Restorasi Gagal')),
                                   ],
                                 ),
                                 content: Text('Gagal memproses file backup: ${restoreResult['error']}'),
@@ -1608,7 +1634,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
               const SizedBox(height: 6),
               TextField(
                 controller: restoreController,
-                maxLines: 4,
+                maxLines: 3,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                 decoration: InputDecoration(
                   hintText: 'Tempel teks JSON di sini...',
@@ -1616,13 +1642,16 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                   contentPadding: const EdgeInsets.all(10),
                 ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const SizedBox(height: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextButton.icon(
+                  OutlinedButton.icon(
                     icon: const Icon(Icons.paste, size: 16),
-                    label: const Text('Tempel Clipboard', style: TextStyle(fontSize: 12)),
+                    label: const Text('Tempel dari Clipboard', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                     onPressed: () async {
                       final data = await Clipboard.getData(Clipboard.kTextPlain);
                       if (data?.text != null && data!.text!.isNotEmpty) {
@@ -1630,7 +1659,13 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                       }
                     },
                   ),
+                  const SizedBox(height: 6),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orangeAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                     onPressed: () async {
                       final text = restoreController.text.trim();
                       if (text.isEmpty) return;
@@ -1646,7 +1681,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                                 children: [
                                   Icon(Icons.check_circle, color: Colors.green),
                                   SizedBox(width: 8),
-                                  Text('Restorasi Sukses'),
+                                  Expanded(child: Text('Restorasi Sukses')),
                                 ],
                               ),
                               content: Text(
@@ -1670,7 +1705,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                                 children: [
                                   Icon(Icons.error, color: Colors.red),
                                   SizedBox(width: 8),
-                                  Text('Restorasi Gagal'),
+                                  Expanded(child: Text('Restorasi Gagal')),
                                 ],
                               ),
                               content: Text('Gagal memulihkan data: ${restoreResult['error']}'),
@@ -1685,7 +1720,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                         }
                       }
                     },
-                    child: const Text('RESTORE TEKS'),
+                    child: const Text('RESTORE TEKS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 ],
               ),

@@ -1411,6 +1411,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                         const Flexible(
                           child: Text('Total Draf Kuesioner:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
+                        const SizedBox(width: 8),
                         Chip(
                           label: Text('$draftsCount Draf', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           backgroundColor: Colors.orange,
@@ -1425,6 +1426,7 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
                         const Flexible(
                           child: Text('Total Tersinkron:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
+                        const SizedBox(width: 8),
                         Chip(
                           label: Text('$syncedCount Data', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           backgroundColor: Colors.green,
@@ -1438,10 +1440,12 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 icon: const Icon(Icons.share, size: 20),
-                label: const Text(
-                  'BAGIKAN / SIMPAN FILE BACKUP (.json)',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                label: const Flexible(
+                  child: Text(
+                    'BAGIKAN / SIMPAN FILE BACKUP (.json)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
@@ -1477,7 +1481,9 @@ class _SurveyDashboardScreenState extends State<SurveyDashboardScreen> {
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 icon: const Icon(Icons.copy, size: 18),
-                label: const Text('Salin Teks Kode Backup', style: TextStyle(fontSize: 12)),
+                label: const Flexible(
+                  child: Text('Salin Teks Kode Backup', style: TextStyle(fontSize: 12)),
+                ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(42),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
